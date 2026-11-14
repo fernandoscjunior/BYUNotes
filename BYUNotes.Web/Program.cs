@@ -1,6 +1,11 @@
 using BYUNotes.Web.Components;
+using BYUNotes.Web.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContextFactory<NotesDbContext>(options =>
+    options.UseSqlite("Data Source=byunotes.db"));
 
 // Add services to the container.
 builder.Services.AddRazorComponents()

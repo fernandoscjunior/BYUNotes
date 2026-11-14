@@ -1,10 +1,12 @@
-﻿
-
-@page "/"
+﻿@page "/"
 @using System.Linq
 @using System.IO
 @using Microsoft.JSInterop
+@using Microsoft.EntityFrameworkCore
+@using BYUNotes.Web.Models
+@using BYUNotes.Web.Data
 @inject IJSRuntime JS
+@inject IDbContextFactory<NotesDbContext> DbFactory
 
 <PageTitle>BYUNotes Dashboard</PageTitle>
 
@@ -68,7 +70,7 @@
 
             <button type="button"
                     class="btn btn-success"
-                    @onclick="CreateNote">
+                    @onclick="CreateNoteAsync">
                 + New Note
             </button>
         </div>
@@ -86,7 +88,7 @@
 
                 <input class="form-control mb-3"
                        @bind="selectedNote.Title"
-                       @bind:after="UpdateLastEdited" />
+                       @bind:after="SaveNoteAsync" />
 
                 <p class="text-muted">
                     Type: @selectedNote.Type
@@ -103,7 +105,7 @@
                     <textarea class="form-control mb-3"
                               rows="3"
                               @bind="selectedNote.Cues"
-                              @bind:after="UpdateLastEdited"></textarea>
+                              @bind:after="SaveNoteAsync"></textarea>
 
                     <label class="form-label">
                         Main Notes
@@ -112,7 +114,7 @@
                     <textarea class="form-control mb-3"
                               rows="6"
                               @bind="selectedNote.Content"
-                              @bind:after="UpdateLastEdited"></textarea>
+                              @bind:after="SaveNoteAsync"></textarea>
 
                     <label class="form-label">
                         Summary
@@ -121,7 +123,7 @@
                     <textarea class="form-control mb-3"
                               rows="3"
                               @bind="selectedNote.Summary"
-                              @bind:after="UpdateLastEdited"></textarea>
+                              @bind:after="SaveNoteAsync"></textarea>
                 }
                 else
                 {
@@ -132,7 +134,7 @@
                     <textarea class="form-control mb-3"
                               rows="5"
                               @bind="selectedNote.Content"
-                              @bind:after="UpdateLastEdited"></textarea>
+                              @bind:after="SaveNoteAsync"></textarea>
                 }
 
                 <p class="text-muted">
@@ -158,7 +160,7 @@
                 <!-- DELETE BUTTON -->
                 <button type="button"
                         class="btn btn-danger mt-2"
-                        @onclick="DeleteNote">
+                        @onclick="DeleteNoteAsync">
                     Delete Note
                 </button>
             }
@@ -174,36 +176,9 @@
     </div>
 </div>
 
-@code {
-    private class StudentNote
-    {
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public string Title { get; set; } = "";
-        public string Type { get; set; } = "Regular";
-        public string Content { get; set; } = "";
-        public string Cues { get; set; } = "";
-        public string Summary { get; set; } = "";
-        public DateTime LastEdited { get; set; } = DateTime.Now;
-    }
 
-    private List<StudentNote> notes = new()
-    {
-        new StudentNote
-        {
-            Title = "Biology Notes",
-            Content = "Cells are the basic units of life."
-        },
-        new StudentNote
-        {
-            Title = "Programming Notes",
-            Content = "Blazor uses C# to build interactive web applications."
-        },
-        new StudentNote
-        {
-            Title = "History Notes",
-            Content = "History helps us understand past events."
-        }
-    };
+@code {
+    private List<StudentNote> notes = new();
 
     private StudentNote? selectedNote;
     private string newNoteType = "Regular";
@@ -215,12 +190,27 @@
                 searchText ?? "",
                 StringComparison.OrdinalIgnoreCase));
 
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadNotesAsync();
+    }
+
+    private async Task LoadNotesAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        notes = await db.Notes
+            .AsNoTracking()
+            .OrderByDescending(n => n.LastEdited)
+            .ToListAsync();
+    }
+
     private void SelectNote(StudentNote note)
     {
         selectedNote = note;
     }
 
-    private void CreateNote()
+    private async Task CreateNoteAsync()
     {
         var note = new StudentNote
         {
@@ -229,25 +219,40 @@
             LastEdited = DateTime.Now
         };
 
-        notes.Add(note);
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        db.Notes.Add(note);
+        await db.SaveChangesAsync();
+
+        notes.Insert(0, note);
         selectedNote = note;
     }
 
-    private void UpdateLastEdited()
+    private async Task SaveNoteAsync()
     {
-        if (selectedNote is not null)
-        {
-            selectedNote.LastEdited = DateTime.Now;
-        }
+        if (selectedNote is null)
+            return;
+
+        selectedNote.LastEdited = DateTime.Now;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        db.Notes.Update(selectedNote);
+        await db.SaveChangesAsync();
     }
 
-    private void DeleteNote()
+    private async Task DeleteNoteAsync()
     {
-        if (selectedNote is not null)
-        {
-            notes.Remove(selectedNote);
-            selectedNote = null;
-        }
+        if (selectedNote is null)
+            return;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        db.Notes.Remove(selectedNote);
+        await db.SaveChangesAsync();
+
+        notes.Remove(selectedNote);
+        selectedNote = null;
     }
 
     private async Task ExportNoteAsync(bool markdown)
@@ -296,3 +301,4 @@
             contentType);
     }
 }
+

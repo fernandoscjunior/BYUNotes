@@ -5,3 +5,8 @@
 *.user
 *.suo
 *.log
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
