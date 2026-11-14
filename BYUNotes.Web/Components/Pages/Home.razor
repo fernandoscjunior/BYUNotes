@@ -1,0 +1,298 @@
+﻿
+
+@page "/"
+@using System.Linq
+@using System.IO
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<PageTitle>BYUNotes Dashboard</PageTitle>
+
+<h1>BYUNotes Dashboard</h1>
+<p>Organize your studies in one place.</p>
+
+<div class="row mt-4 g-3">
+
+    <!-- LEFT PANEL: NOTES LIST -->
+    <div class="col-md-4">
+        <div class="card p-3 h-100">
+            <h3>My Notes</h3>
+            <hr />
+
+            <input class="form-control mb-3"
+                   placeholder="Search notes..."
+                   @bind="searchText"
+                   @bind:event="oninput" />
+
+            @if (notes.Count == 0)
+            {
+                <p class="text-muted">
+                    No notes yet. Create your first note!
+                </p>
+            }
+            else if (!filteredNotes.Any())
+            {
+                <p class="text-muted">
+                    No matching notes found.
+                </p>
+            }
+            else
+            {
+                @foreach (var note in filteredNotes)
+                {
+                    <button type="button"
+                            @key="note.Id"
+                            class="btn mb-2 text-start @(selectedNote?.Id == note.Id ? "btn-primary" : "btn-outline-primary")"
+                            @onclick="() => SelectNote(note)">
+
+                        <strong>@note.Title</strong>
+                        <br />
+                        <small>
+                            Edited: @note.LastEdited.ToString("MMM dd, yyyy h:mm tt")
+                        </small>
+                    </button>
+                }
+            }
+
+            <hr />
+
+            <label class="form-label">
+                Note Type
+            </label>
+
+            <select class="form-select mb-2"
+                    @bind="newNoteType">
+                <option value="Regular">Regular Note</option>
+                <option value="Cornell">Cornell Notes</option>
+            </select>
+
+            <button type="button"
+                    class="btn btn-success"
+                    @onclick="CreateNote">
+                + New Note
+            </button>
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL: NOTE EDITOR -->
+    <div class="col-md-8">
+        <div class="card p-3 h-100">
+            <h3>Note Editor</h3>
+            <hr />
+
+            @if (selectedNote is not null)
+            {
+                <label class="form-label">Title</label>
+
+                <input class="form-control mb-3"
+                       @bind="selectedNote.Title"
+                       @bind:after="UpdateLastEdited" />
+
+                <p class="text-muted">
+                    Type: @selectedNote.Type
+                </p>
+
+                @if (selectedNote.Type == "Cornell")
+                {
+                    <h5>Cornell Notes</h5>
+
+                    <label class="form-label">
+                        Cues / Questions
+                    </label>
+
+                    <textarea class="form-control mb-3"
+                              rows="3"
+                              @bind="selectedNote.Cues"
+                              @bind:after="UpdateLastEdited"></textarea>
+
+                    <label class="form-label">
+                        Main Notes
+                    </label>
+
+                    <textarea class="form-control mb-3"
+                              rows="6"
+                              @bind="selectedNote.Content"
+                              @bind:after="UpdateLastEdited"></textarea>
+
+                    <label class="form-label">
+                        Summary
+                    </label>
+
+                    <textarea class="form-control mb-3"
+                              rows="3"
+                              @bind="selectedNote.Summary"
+                              @bind:after="UpdateLastEdited"></textarea>
+                }
+                else
+                {
+                    <label class="form-label">
+                        Note Content
+                    </label>
+
+                    <textarea class="form-control mb-3"
+                              rows="5"
+                              @bind="selectedNote.Content"
+                              @bind:after="UpdateLastEdited"></textarea>
+                }
+
+                <p class="text-muted">
+                    Last edited:
+                    @selectedNote.LastEdited.ToString("MMM dd, yyyy h:mm tt")
+                </p>
+
+                <!-- EXPORT BUTTONS -->
+                <div class="d-flex gap-2 mb-3">
+                    <button type="button"
+                            class="btn btn-outline-primary"
+                            @onclick="() => ExportNoteAsync(false)">
+                        Export .txt
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-outline-success"
+                            @onclick="() => ExportNoteAsync(true)">
+                        Export .md
+                    </button>
+                </div>
+
+                <!-- DELETE BUTTON -->
+                <button type="button"
+                        class="btn btn-danger mt-2"
+                        @onclick="DeleteNote">
+                    Delete Note
+                </button>
+            }
+            else
+            {
+                <h5>Select a note</h5>
+                <p>
+                    Choose a note from the left panel
+                    or create a new one.
+                </p>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private class StudentNote
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Title { get; set; } = "";
+        public string Type { get; set; } = "Regular";
+        public string Content { get; set; } = "";
+        public string Cues { get; set; } = "";
+        public string Summary { get; set; } = "";
+        public DateTime LastEdited { get; set; } = DateTime.Now;
+    }
+
+    private List<StudentNote> notes = new()
+    {
+        new StudentNote
+        {
+            Title = "Biology Notes",
+            Content = "Cells are the basic units of life."
+        },
+        new StudentNote
+        {
+            Title = "Programming Notes",
+            Content = "Blazor uses C# to build interactive web applications."
+        },
+        new StudentNote
+        {
+            Title = "History Notes",
+            Content = "History helps us understand past events."
+        }
+    };
+
+    private StudentNote? selectedNote;
+    private string newNoteType = "Regular";
+    private string searchText = "";
+
+    private IEnumerable<StudentNote> filteredNotes =>
+        notes.Where(note =>
+            (note.Title ?? "").Contains(
+                searchText ?? "",
+                StringComparison.OrdinalIgnoreCase));
+
+    private void SelectNote(StudentNote note)
+    {
+        selectedNote = note;
+    }
+
+    private void CreateNote()
+    {
+        var note = new StudentNote
+        {
+            Title = "Untitled Note",
+            Type = newNoteType,
+            LastEdited = DateTime.Now
+        };
+
+        notes.Add(note);
+        selectedNote = note;
+    }
+
+    private void UpdateLastEdited()
+    {
+        if (selectedNote is not null)
+        {
+            selectedNote.LastEdited = DateTime.Now;
+        }
+    }
+
+    private void DeleteNote()
+    {
+        if (selectedNote is not null)
+        {
+            notes.Remove(selectedNote);
+            selectedNote = null;
+        }
+    }
+
+    private async Task ExportNoteAsync(bool markdown)
+    {
+        if (selectedNote is null)
+            return;
+
+        var note = selectedNote;
+        var extension = markdown ? ".md" : ".txt";
+
+        var safeTitle = string.Join("_",
+            note.Title.Split(Path.GetInvalidFileNameChars()));
+
+        if (string.IsNullOrWhiteSpace(safeTitle))
+            safeTitle = "Untitled_Note";
+
+        string content;
+
+        if (note.Type == "Cornell")
+        {
+            content = markdown
+                ? $"# {note.Title}\n\n" +
+                  $"## Cues / Questions\n{note.Cues}\n\n" +
+                  $"## Main Notes\n{note.Content}\n\n" +
+                  $"## Summary\n{note.Summary}\n"
+                : $"{note.Title}\n\n" +
+                  $"Cues / Questions:\n{note.Cues}\n\n" +
+                  $"Main Notes:\n{note.Content}\n\n" +
+                  $"Summary:\n{note.Summary}\n";
+        }
+        else
+        {
+            content = markdown
+                ? $"# {note.Title}\n\n{note.Content}\n"
+                : $"{note.Title}\n\n{note.Content}\n";
+        }
+
+        var contentType = markdown
+            ? "text/markdown;charset=utf-8"
+            : "text/plain;charset=utf-8";
+
+        await JS.InvokeVoidAsync(
+            "downloadNote",
+            safeTitle + extension,
+            content,
+            contentType);
+    }
+}
