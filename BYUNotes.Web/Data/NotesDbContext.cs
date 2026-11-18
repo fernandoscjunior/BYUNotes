@@ -11,5 +11,13 @@ public class NotesDbContext : DbContext
     {
     }
 
-    public DbSet<StudentNote> Notes { get; set; } = null!;
+    public DbSet<Note> Notes { get; set; } = null!;
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<CornellNote>();
+        modelBuilder.Entity<TextNote>();
+
+    }
 }

@@ -1,12 +1,12 @@
 ﻿@page "/"
 @using System.Linq
-@using System.IO
-@using Microsoft.JSInterop
-@using Microsoft.EntityFrameworkCore
+@using BYUNotes.Web.Components.Pages.Notes
 @using BYUNotes.Web.Models
-@using BYUNotes.Web.Data
+@using BYUNotes.Web.Services
+
+@inject NoteService NoteService
+@inject ExportNoteService ExportNoteService
 @inject IJSRuntime JS
-@inject IDbContextFactory<NotesDbContext> DbFactory
 
 <PageTitle>BYUNotes Dashboard</PageTitle>
 
@@ -64,7 +64,7 @@
 
             <select class="form-select mb-2"
                     @bind="newNoteType">
-                <option value="Regular">Regular Note</option>
+                <option value="Text">Text Note</option>
                 <option value="Cornell">Cornell Notes</option>
             </select>
 
@@ -75,74 +75,22 @@
             </button>
         </div>
     </div>
-
     <!-- RIGHT PANEL: NOTE EDITOR -->
     <div class="col-md-8">
         <div class="card p-3 h-100">
-            <h3>Note Editor</h3>
-            <hr />
-
             @if (selectedNote is not null)
             {
-                <label class="form-label">Title</label>
-
-                <input class="form-control mb-3"
-                       @bind="selectedNote.Title"
-                       @bind:after="SaveNoteAsync" />
-
-                <p class="text-muted">
-                    Type: @selectedNote.Type
-                </p>
-
-                @if (selectedNote.Type == "Cornell")
+                if (selectedNote is CornellNote cornellNote)
                 {
-                    <h5>Cornell Notes</h5>
-
-                    <label class="form-label">
-                        Cues / Questions
-                    </label>
-
-                    <textarea class="form-control mb-3"
-                              rows="3"
-                              @bind="selectedNote.Cues"
-                              @bind:after="SaveNoteAsync"></textarea>
-
-                    <label class="form-label">
-                        Main Notes
-                    </label>
-
-                    <textarea class="form-control mb-3"
-                              rows="6"
-                              @bind="selectedNote.Content"
-                              @bind:after="SaveNoteAsync"></textarea>
-
-                    <label class="form-label">
-                        Summary
-                    </label>
-
-                    <textarea class="form-control mb-3"
-                              rows="3"
-                              @bind="selectedNote.Summary"
-                              @bind:after="SaveNoteAsync"></textarea>
+                    <CornellNoteComponent SelectedNote="cornellNote"
+                    OnDelete="DeleteNoteAsync"></CornellNoteComponent>
                 }
-                else
+                else if (selectedNote is TextNote textNote)
                 {
-                    <label class="form-label">
-                        Note Content
-                    </label>
-
-                    <textarea class="form-control mb-3"
-                              rows="5"
-                              @bind="selectedNote.Content"
-                              @bind:after="SaveNoteAsync"></textarea>
+                    <TextNoteComponent SelectedNote="textNote"
+                    OnDelete="DeleteNoteAsync"></TextNoteComponent>
                 }
-
-                <p class="text-muted">
-                    Last edited:
-                    @selectedNote.LastEdited.ToString("MMM dd, yyyy h:mm tt")
-                </p>
-
-                <!-- EXPORT BUTTONS -->
+                 <!-- EXPORT BUTTONS -->
                 <div class="d-flex gap-2 mb-3">
                     <button type="button"
                             class="btn btn-outline-primary"
@@ -156,13 +104,6 @@
                         Export .md
                     </button>
                 </div>
-
-                <!-- DELETE BUTTON -->
-                <button type="button"
-                        class="btn btn-danger mt-2"
-                        @onclick="DeleteNoteAsync">
-                    Delete Note
-                </button>
             }
             else
             {
@@ -172,19 +113,20 @@
                     or create a new one.
                 </p>
             }
-        </div>
     </div>
+</div>            
 </div>
 
 
 @code {
-    private List<StudentNote> notes = new();
+    private string? focusField;
+    private List<Note> notes = new();
 
-    private StudentNote? selectedNote;
-    private string newNoteType = "Regular";
+    private Note? selectedNote;
+    private string newNoteType = "Text";
     private string searchText = "";
 
-    private IEnumerable<StudentNote> filteredNotes =>
+    private IEnumerable<Note> filteredNotes =>
         notes.Where(note =>
             (note.Title ?? "").Contains(
                 searchText ?? "",
@@ -197,108 +139,60 @@
 
     private async Task LoadNotesAsync()
     {
-        await using var db = await DbFactory.CreateDbContextAsync();
-
-        notes = await db.Notes
-            .AsNoTracking()
-            .OrderByDescending(n => n.LastEdited)
-            .ToListAsync();
+        notes= await NoteService.LoadNotesAsync();
+        if (notes.Count > 0)
+            selectedNote = notes[0];
     }
 
-    private void SelectNote(StudentNote note)
+    private void SelectNote(Note note)
     {
         selectedNote = note;
+        focusField = "Content";
     }
 
     private async Task CreateNoteAsync()
     {
-        var note = new StudentNote
+        if (newNoteType == "Cornell")
         {
-            Title = "Untitled Note",
-            Type = newNoteType,
-            LastEdited = DateTime.Now
-        };
+            var note = new CornellNote
+            {
+                Title = "Untitled Note",
+            };
+            await NoteService.CreateNoteAsync(note);
+            notes.Insert(0, note);
+            selectedNote = note;
+        }
+        else
+        {
+            var note = new TextNote
+            {
+                Title = "Untitled Note",
+            };
+            await NoteService.CreateNoteAsync(note);
+            notes.Insert(0, note);
+            selectedNote = note;
+        }
 
-        await using var db = await DbFactory.CreateDbContextAsync();
-
-        db.Notes.Add(note);
-        await db.SaveChangesAsync();
-
-        notes.Insert(0, note);
-        selectedNote = note;
+        focusField = "Title";
     }
 
-    private async Task SaveNoteAsync()
-    {
-        if (selectedNote is null)
-            return;
-
-        selectedNote.LastEdited = DateTime.Now;
-
-        await using var db = await DbFactory.CreateDbContextAsync();
-
-        db.Notes.Update(selectedNote);
-        await db.SaveChangesAsync();
-    }
 
     private async Task DeleteNoteAsync()
     {
         if (selectedNote is null)
             return;
 
-        await using var db = await DbFactory.CreateDbContextAsync();
-
-        db.Notes.Remove(selectedNote);
-        await db.SaveChangesAsync();
-
+        await NoteService.DeleteNoteAsync(selectedNote);
         notes.Remove(selectedNote);
-        selectedNote = null;
+        if (notes.Count > 0)
+            selectedNote = notes[0];
     }
 
     private async Task ExportNoteAsync(bool markdown)
     {
-        if (selectedNote is null)
-            return;
-
-        var note = selectedNote;
-        var extension = markdown ? ".md" : ".txt";
-
-        var safeTitle = string.Join("_",
-            note.Title.Split(Path.GetInvalidFileNameChars()));
-
-        if (string.IsNullOrWhiteSpace(safeTitle))
-            safeTitle = "Untitled_Note";
-
-        string content;
-
-        if (note.Type == "Cornell")
-        {
-            content = markdown
-                ? $"# {note.Title}\n\n" +
-                  $"## Cues / Questions\n{note.Cues}\n\n" +
-                  $"## Main Notes\n{note.Content}\n\n" +
-                  $"## Summary\n{note.Summary}\n"
-                : $"{note.Title}\n\n" +
-                  $"Cues / Questions:\n{note.Cues}\n\n" +
-                  $"Main Notes:\n{note.Content}\n\n" +
-                  $"Summary:\n{note.Summary}\n";
-        }
-        else
-        {
-            content = markdown
-                ? $"# {note.Title}\n\n{note.Content}\n"
-                : $"{note.Title}\n\n{note.Content}\n";
-        }
-
-        var contentType = markdown
-            ? "text/markdown;charset=utf-8"
-            : "text/plain;charset=utf-8";
-
-        await JS.InvokeVoidAsync(
-            "downloadNote",
-            safeTitle + extension,
-            content,
-            contentType);
+        await ExportNoteService.ExportNoteAsync(markdown, selectedNote);
     }
+
+
 }
 

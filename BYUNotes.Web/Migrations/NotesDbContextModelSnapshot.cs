@@ -17,7 +17,7 @@ namespace BYUNotes.Web.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.22");
 
-            modelBuilder.Entity("BYUNotes.Web.Models.StudentNote", b =>
+            modelBuilder.Entity("BYUNotes.Web.Models.CornellNoteDetail", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -27,28 +27,82 @@ namespace BYUNotes.Web.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Cues")
+                    b.Property<Guid?>("CornellNoteId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Cue")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CueSequence")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CornellNoteId");
+
+                    b.ToTable("CornellNoteDetail");
+                });
+
+            modelBuilder.Entity("BYUNotes.Web.Models.Note", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Discriminator")
+                        .IsRequired()
+                        .HasMaxLength(13)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("LastEdited")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Summary")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
                     b.HasKey("Id");
 
                     b.ToTable("Notes");
+
+                    b.HasDiscriminator().HasValue("Note");
+
+                    b.UseTphMappingStrategy();
+                });
+
+            modelBuilder.Entity("BYUNotes.Web.Models.CornellNote", b =>
+                {
+                    b.HasBaseType("BYUNotes.Web.Models.Note");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasDiscriminator().HasValue("CornellNote");
+                });
+
+            modelBuilder.Entity("BYUNotes.Web.Models.TextNote", b =>
+                {
+                    b.HasBaseType("BYUNotes.Web.Models.Note");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasDiscriminator().HasValue("TextNote");
+                });
+
+            modelBuilder.Entity("BYUNotes.Web.Models.CornellNoteDetail", b =>
+                {
+                    b.HasOne("BYUNotes.Web.Models.CornellNote", null)
+                        .WithMany("Cues")
+                        .HasForeignKey("CornellNoteId");
+                });
+
+            modelBuilder.Entity("BYUNotes.Web.Models.CornellNote", b =>
+                {
+                    b.Navigation("Cues");
                 });
 #pragma warning restore 612, 618
         }
