@@ -1,0 +1,117 @@
+
+@page "/register"
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+
+<PageTitle>Register - BYU Notes</PageTitle>
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h2>Create an Account</h2>
+                    <p class="text-muted">
+                        Register to get started with BYU Notes.
+                    </p>
+
+                    <EditForm Model="@registration"
+                              OnValidSubmit="HandleRegistration">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <InputText id="email"
+                                       class="form-control"
+                                       type="email"
+                                       autocomplete="email"
+                                       @bind-Value="registration.Email" />
+                            <ValidationMessage For="@(() => registration.Email)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <InputText id="password"
+                                       class="form-control"
+                                       type="password"
+                                       autocomplete="new-password"
+                                       @bind-Value="registration.Password" />
+                            <ValidationMessage For="@(() => registration.Password)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">
+                                Confirm Password
+                            </label>
+                            <InputText id="confirmPassword"
+                                       class="form-control"
+                                       type="password"
+                                       autocomplete="new-password"
+                                       @bind-Value="registration.ConfirmPassword" />
+                            <ValidationMessage For="@(() => registration.ConfirmPassword)" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(passwordError))
+                        {
+                            <div class="text-danger mb-3" role="alert">
+                                @passwordError
+                            </div>
+                        }
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            Create Account
+                        </button>
+                    </EditForm>
+
+                    @if (!string.IsNullOrEmpty(resultMessage))
+                    {
+                        <div class="alert alert-info mt-3" role="status">
+                            @resultMessage
+                        </div>
+                    }
+
+                    <p class="text-center mt-3 mb-0">
+                        Already have an account?
+                        <a href="/login">Log in</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegistrationModel registration = new();
+    private string resultMessage = string.Empty;
+    private string passwordError = string.Empty;
+
+    private void HandleRegistration()
+    {
+        resultMessage = string.Empty;
+        passwordError = string.Empty;
+
+        if (registration.Password != registration.ConfirmPassword)
+        {
+            passwordError = "Passwords do not match.";
+            return;
+        }
+
+        resultMessage =
+            "Registration form validated successfully. Account creation will be available when authentication is connected.";
+    }
+
+    public sealed class RegistrationModel
+    {
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Please enter a valid email address.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Password is required.")]
+        [MinLength(8, ErrorMessage = "Password must be at least 8 characters.")]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Please confirm your password.")]
+        [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}
