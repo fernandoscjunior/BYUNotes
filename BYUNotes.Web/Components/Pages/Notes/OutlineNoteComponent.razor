@@ -1,0 +1,239 @@
+
+@using BYUNotes.Web.Models
+@using BYUNotes.Web.Services
+@inject NoteService NoteService
+
+<div class="d-flex justify-content-between align-items-center">
+    <h3 class="mb-0">Outline Note Editor</h3>
+
+    <div class="d-flex align-items-center gap-3">
+        <span class="text-muted">@saveStatus</span>
+
+        <button type="button"
+                class="btn btn-outline-danger btn-sm"
+                title="Delete note"
+                @onclick="() => OnDelete.InvokeAsync()">
+            <i class="bi bi-trash"></i> Delete
+        </button>
+    </div>
+</div>
+
+<hr />
+
+<label class="form-label">Title</label>
+<input class="form-control mb-3"
+       @bind="SelectedNote.Title"
+       @bind:event="oninput"
+       @bind:after="OnNoteChanged"
+       @onblur="SaveNoteAsync" />
+
+<h5>Outline</h5>
+
+
+<div class="row g-3 mb-3">
+
+    <!-- LEFT: Outline Editor -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <strong>Edit Outline</strong>
+            </div>
+
+            <div class="card-body">
+                <p class="text-muted small">
+                    Use # for headings, ## for subheadings,
+                    and - for bullet points.
+                </p>
+
+                <textarea class="form-control mb-3"
+                          rows="16"
+                          placeholder="Start writing your outline here..."
+                          @bind="SelectedNote.Content"
+                          @bind:event="oninput"
+                          @bind:after="OnNoteChanged"
+                          @onblur="SaveNoteAsync">
+                </textarea>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button"
+                            class="btn btn-outline-primary btn-sm"
+                            @onclick='() => InsertText("# Heading")'>
+                        + Heading
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            @onclick='() => InsertText("## Subheading")'>
+                        + Subheading
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            @onclick='() => InsertText("- Bullet point")'>
+                        + Bullet
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: Live Preview -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <strong>Live Preview</strong>
+            </div>
+
+            <div class="card-body">
+                @if (string.IsNullOrWhiteSpace(SelectedNote.Content))
+                {
+                    <p class="text-muted">
+                        Your formatted outline will appear here.
+                    </p>
+                }
+                else
+                {
+                    @foreach (var line in SelectedNote.Content.Split('\n'))
+                    {
+                        var text = line.Trim();
+
+                        if (text.StartsWith("## "))
+                        {
+                            <h5 class="ms-3 mt-3">
+                                @text.Substring(3)
+                            </h5>
+                        }
+                        else if (text.StartsWith("# "))
+                        {
+                            <h4 class="mt-3">
+                                @text.Substring(2)
+                            </h4>
+                        }
+                        else if (text.StartsWith("- "))
+                        {
+                            <div class="ms-4 mb-1">
+                                • @text.Substring(2)
+                            </div>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(text))
+                        {
+                            <p class="ms-3 mb-2">@text</p>
+                        }
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+<textarea class="form-control mb-3"
+          rows="14"
+          placeholder="Start writing your outline here..."
+          @bind="SelectedNote.Content"
+          @bind:event="oninput"
+          @bind:after="OnNoteChanged"
+          @onblur="SaveNoteAsync">
+</textarea>
+
+<div class="d-flex gap-2 mb-3">
+    <button class="btn btn-outline-primary btn-sm"
+            @onclick='() => InsertText("# Heading")'>
+        + Heading
+    </button>
+
+    <button class="btn btn-outline-secondary btn-sm"
+            @onclick='() => InsertText("## Subheading")'>
+        + Subheading
+    </button>
+
+    <button class="btn btn-outline-secondary btn-sm"
+            @onclick='() => InsertText("- Bullet point")'>
+        + Bullet
+    </button>
+</div>
+
+<div class="card mt-3 mb-3">
+    <div class="card-header">
+        <strong>Outline Preview</strong>
+    </div>
+
+    <div class="card-body">
+        @foreach (var line in SelectedNote.Content.Split('\n'))
+        {
+            var text = line.Trim();
+
+            if (text.StartsWith("## "))
+            {
+                <h5 class="ms-4 mt-3">
+                    @text.Substring(3)
+                </h5>
+            }
+            else if (text.StartsWith("# "))
+            {
+                <h4 class="mt-3">
+                    @text.Substring(2)
+                </h4>
+            }
+            else if (text.StartsWith("- "))
+            {
+                <div class="ms-5 mb-1">
+                    • @text.Substring(2)
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(text))
+            {
+                <p class="ms-4 mb-2">@text</p>
+            }
+        }
+    </div>
+</div>
+
+<p class="text-muted small">
+    Last edited:
+    @SelectedNote.LastEdited.ToString("MMM dd, yyyy h:mm tt")
+</p>
+
+@code {
+    [Parameter, EditorRequired]
+    public OutlineNote SelectedNote { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    private string saveStatus = "Saved";
+
+    private void OnNoteChanged()
+    {
+        saveStatus = "Unsaved changes";
+    }
+
+    private async Task InsertText(string text)
+    {
+        SelectedNote.Content +=
+            (string.IsNullOrEmpty(SelectedNote.Content)
+                ? ""
+                : Environment.NewLine)
+            + text;
+
+        OnNoteChanged();
+        await SaveNoteAsync();
+    }
+
+    private async Task SaveNoteAsync()
+    {
+        saveStatus = "Saving...";
+
+        try
+        {
+            SelectedNote.LastEdited = DateTime.Now;
+            await NoteService.SaveNoteAsync(SelectedNote);
+            saveStatus = "Saved";
+        }
+        catch
+        {
+            saveStatus = "Save failed";
+        }
+    }
+}
