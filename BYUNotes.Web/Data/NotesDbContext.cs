@@ -13,12 +13,10 @@ public class NotesDbContext : DbContext
 
     public DbSet<Note> Notes { get; set; } = null!;
 
-    
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-       
         modelBuilder.Entity<CornellNote>();
 
         modelBuilder.Entity<TextNote>()
@@ -28,8 +26,10 @@ public class NotesDbContext : DbContext
         modelBuilder.Entity<OutlineNote>()
             .Property(n => n.Content)
             .HasColumnName("Content");
-            modelBuilder.Entity<MappingNote>();
 
+        modelBuilder.Entity<MappingNote>();
+
+        modelBuilder.Entity<ChartingNote>();
     }
-
 }
+

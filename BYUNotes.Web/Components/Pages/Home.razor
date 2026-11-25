@@ -73,6 +73,7 @@
                 <option value="Cornell">Cornell Notes</option>
                 <option value="Outline">Outline Notes</option>
                 <option value="Mapping">Mapping Notes</option>
+                <option value="Charting">Charting Notes</option>
 
             </select>
 
@@ -219,6 +220,15 @@
                         SelectedNote="mappingNote"
                         OnDelete="DeleteNoteAsync" />
                 }
+
+                <!-- CHARTING NOTES -->
+                else if (selectedNote is ChartingNote chartingNote)
+                {
+                    <ChartingNoteComponent
+                        @key="chartingNote.Id"
+                        SelectedNote="chartingNote"
+                        OnDelete="DeleteNoteAsync" />
+                }
             }
             else
             {
@@ -283,6 +293,7 @@
             "Cornell" => new CornellNote(),
             "Outline" => new OutlineNote(),
             "Mapping" => new MappingNote(),
+            "Charting" => new ChartingNote(),
             _ => new TextNote()
         };
 

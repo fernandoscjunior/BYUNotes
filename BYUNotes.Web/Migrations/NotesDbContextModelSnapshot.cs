@@ -71,6 +71,21 @@ namespace BYUNotes.Web.Migrations
                     b.UseTphMappingStrategy();
                 });
 
+            modelBuilder.Entity("BYUNotes.Web.Models.ChartingNote", b =>
+                {
+                    b.HasBaseType("BYUNotes.Web.Models.Note");
+
+                    b.Property<string>("ColumnsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RowsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasDiscriminator().HasValue("ChartingNote");
+                });
+
             modelBuilder.Entity("BYUNotes.Web.Models.CornellNote", b =>
                 {
                     b.HasBaseType("BYUNotes.Web.Models.Note");

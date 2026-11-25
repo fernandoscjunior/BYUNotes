@@ -13,6 +13,7 @@ public class ExportNoteService(IJSRuntime JS)
     {
         if (selectedNote is null)
             return;
+
         format = format.Trim().ToLowerInvariant();
 
         // Existing text-based exports
@@ -44,6 +45,7 @@ public class ExportNoteService(IJSRuntime JS)
             safeTitle,
             format);
     }
+
     public async Task ExportNoteAsync(bool markdown, Note? selectedNote)
     {
         if (selectedNote is null)
@@ -159,6 +161,131 @@ public class ExportNoteService(IJSRuntime JS)
             }
         }
 
+        // CHARTING NOTES
+        else if (note is ChartingNote chartingNote)
+        {
+            var columns =
+                JsonSerializer.Deserialize<List<string>>(
+                    string.IsNullOrWhiteSpace(chartingNote.ColumnsJson)
+                        ? "[]"
+                        : chartingNote.ColumnsJson)
+                ?? new List<string>();
+
+            var rows =
+                JsonSerializer.Deserialize<List<ChartingRow>>(
+                    string.IsNullOrWhiteSpace(chartingNote.RowsJson)
+                        ? "[]"
+                        : chartingNote.RowsJson)
+                ?? new List<ChartingRow>();
+
+            // Provide default headings for an empty chart.
+            if (columns.Count == 0)
+            {
+                columns = new List<string>
+                {
+                    "Topic",
+                    "Definition",
+                    "Example"
+                };
+            }
+
+            // Replace empty column headings.
+            for (int i = 0; i < columns.Count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(columns[i]))
+                {
+                    columns[i] = $"Column {i + 1}";
+                }
+            }
+
+            if (markdown)
+            {
+                // MARKDOWN TABLE HEADER
+                builder.AppendLine(
+                    "| " +
+                    string.Join(" | ",
+                        columns.Select(EscapeMarkdownCell)) +
+                    " |");
+
+                // MARKDOWN TABLE SEPARATOR
+                builder.AppendLine(
+                    "| " +
+                    string.Join(" | ",
+                        Enumerable.Repeat("---", columns.Count)) +
+                    " |");
+
+                // MARKDOWN TABLE ROWS
+                foreach (var row in rows)
+                {
+                    var cells = new List<string>();
+
+                    for (int i = 0; i < columns.Count; i++)
+                    {
+                        var value = i < row.Cells.Count
+                            ? row.Cells[i]
+                            : "";
+
+                        cells.Add(EscapeMarkdownCell(value));
+                    }
+
+                    builder.AppendLine(
+                        "| " +
+                        string.Join(" | ", cells) +
+                        " |");
+                }
+
+                if (rows.Count == 0)
+                {
+                    builder.AppendLine();
+                    builder.AppendLine("No chart entries.");
+                }
+            }
+            else
+            {
+                // PLAIN TEXT EXPORT
+                builder.AppendLine("CHARTING NOTES");
+                builder.AppendLine(
+                    new string('=', 50));
+
+                builder.AppendLine();
+
+                builder.AppendLine(
+                    $"Columns: {string.Join(", ", columns)}");
+
+                builder.AppendLine(
+                    $"Total rows: {rows.Count}");
+
+                builder.AppendLine();
+
+                for (int r = 0; r < rows.Count; r++)
+                {
+                    var row = rows[r];
+
+                    builder.AppendLine($"ROW {r + 1}");
+
+                    builder.AppendLine(
+                        new string('-', 40));
+
+                    for (int c = 0; c < columns.Count; c++)
+                    {
+                        var value = c < row.Cells.Count
+                            ? row.Cells[c]
+                            : "";
+
+                        builder.AppendLine(
+                            $"{columns[c]}: {value}");
+                    }
+
+                    builder.AppendLine();
+                }
+
+                if (rows.Count == 0)
+                {
+                    builder.AppendLine("No chart entries.");
+                }
+            }
+        }
+
         var content = builder.ToString();
 
         var contentType = markdown
@@ -170,5 +297,19 @@ public class ExportNoteService(IJSRuntime JS)
             safeTitle + extension,
             content,
             contentType);
+    }
+
+    // Prevent special characters from breaking Markdown tables.
+    private static string EscapeMarkdownCell(string? value)
+    {
+        return (value ?? "")
+            .Replace("\\", "\\\\")
+            .Replace("&", "&amp;")
+            .Replace("<", "&lt;")
+            .Replace(">", "&gt;")
+            .Replace("|", "\\|")
+            .Replace("\r\n", "<br>")
+            .Replace("\n", "<br>")
+            .Replace("\r", "<br>");
     }
 }

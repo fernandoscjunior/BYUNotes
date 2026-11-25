@@ -1,0 +1,501 @@
+
+@using System.Text.Json
+@using BYUNotes.Web.Models
+@using BYUNotes.Web.Services
+@inject NoteService NoteService
+
+<div class="d-flex justify-content-between align-items-center">
+    <h3 class="mb-0">Charting Notes Editor</h3>
+
+    <div class="d-flex align-items-center gap-3">
+        @if (saveStatus == "Saved")
+        {
+            <span class="text-success">
+                <i class="bi bi-check-circle"></i> Saved
+            </span>
+        }
+        else if (saveStatus == "Saving")
+        {
+            <span class="text-muted">
+                <span class="spinner-border spinner-border-sm"></span>
+                Saving...
+            </span>
+        }
+        else if (saveStatus == "Error")
+        {
+            <span class="text-danger">
+                <i class="bi bi-exclamation-circle"></i> Save failed
+            </span>
+        }
+        else
+        {
+            <span class="text-muted">
+                <i class="bi bi-pencil"></i> Unsaved changes
+            </span>
+        }
+
+        <button type="button"
+                class="border-0 bg-transparent text-danger"
+                title="Delete note"
+                @onclick="() => OnDelete.InvokeAsync()">
+            <i class="bi bi-trash"></i>
+        </button>
+    </div>
+</div>
+
+<hr />
+
+@if (SelectedNote is not null)
+{
+    <label class="form-label">Title</label>
+
+    <input class="form-control mb-3"
+           @bind="SelectedNote.Title"
+           @bind:event="oninput"
+           @bind:after="OnNoteChanged"
+           @onblur="SaveNoteAsync" />
+
+    <div class="alert alert-light border">
+        <strong>Charting Method</strong>
+        <p class="mb-0 small text-muted">
+            Organize information into rows and columns to compare
+            topics, definitions, examples, dates, and key concepts.
+            Customize the headings to fit your study needs.
+        </p>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <button type="button"
+                class="btn btn-primary"
+                @onclick="AddColumnAsync">
+            <i class="bi bi-plus-lg"></i> Add Column
+        </button>
+
+        <button type="button"
+                class="btn btn-outline-primary"
+                @onclick="AddRowAsync">
+            <i class="bi bi-plus-lg"></i> Add Row
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 45px;">#</th>
+
+                    @for (int i = 0; i < columns.Count; i++)
+                    {
+                        var columnIndex = i;
+
+                        <th style="min-width: 180px;">
+                            <div class="d-flex align-items-center gap-2">
+
+                                <input class="form-control fw-bold"
+                                       value="@columns[columnIndex]"
+                                       placeholder="Column heading"
+                                       @oninput="e => UpdateColumn(columnIndex, e.Value?.ToString())"
+                                       @onblur="SaveNoteAsync" />
+
+                                <button type="button"
+                                        class="btn btn-sm text-danger"
+                                        title="Delete column"
+                                        disabled="@(columns.Count <= 1)"
+                                        @onclick="() => DeleteColumnAsync(columnIndex)">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+
+                            </div>
+                        </th>
+                    }
+
+                    <th style="width: 50px;"></th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @for (int r = 0; r < rows.Count; r++)
+                {
+                    var rowIndex = r;
+                    var row = rows[rowIndex];
+
+                    <tr @key="row.Id">
+                        <td class="text-muted text-center">
+                            @(rowIndex + 1)
+                        </td>
+
+                        @for (int c = 0; c < columns.Count; c++)
+                        {
+                            var columnIndex = c;
+
+                            <td>
+                                <textarea class="form-control"
+                                          rows="3"
+                                          style="min-width: 160px; resize: vertical;"
+                                          placeholder="Enter notes..."
+                                          value="@row.Cells[columnIndex]"
+                                          @oninput="e => UpdateCell(rowIndex, columnIndex, e.Value?.ToString())"
+                                          @onblur="SaveNoteAsync"></textarea>
+                            </td>
+                        }
+
+                        <td class="text-center">
+                            <button type="button"
+                                    class="btn btn-sm text-danger"
+                                    title="Delete row"
+                                    @onclick="() => DeleteRowAsync(rowIndex)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+
+                @if (rows.Count == 0)
+                {
+                    <tr>
+                        <td colspan="@(columns.Count + 2)"
+                            class="text-center text-muted py-4">
+                            No rows yet. Click Add Row to get started.
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="d-flex justify-content-between text-muted small">
+        <span>
+            @columns.Count column(s) | @rows.Count row(s)
+        </span>
+
+        <span>
+            Last edited:
+            @SelectedNote.LastEdited.ToString("MMM dd, yyyy h:mm tt")
+        </span>
+    </div>
+
+    @* Hidden export preview *@
+
+    <div aria-hidden="true"
+         style="position: fixed; left: -10000px; top: 0; pointer-events: none;">
+
+        <div id="note-export-preview"
+             style="width: @(Math.Max(800, columns.Count * 200 + 80))px;
+                    min-height: 400px;
+                    padding: 40px;
+                    box-sizing: border-box;
+                    background: #ffffff;
+                    color: #212529;
+                    font-family: Arial, sans-serif;">
+
+            <div style="color: #64748b;
+                        font-size: 13px;
+                        font-weight: bold;
+                        letter-spacing: 1px;
+                        margin-bottom: 15px;">
+                BYUNOTES | CHARTING NOTES
+            </div>
+
+            <h1 style="font-size: 32px;
+                       font-weight: bold;
+                       color: #172554;
+                       overflow-wrap: anywhere;
+                       margin-bottom: 10px;">
+
+                @(string.IsNullOrWhiteSpace(SelectedNote.Title)
+                    ? "Untitled Note"
+                    : SelectedNote.Title)
+
+            </h1>
+
+            <p style="font-size: 13px;
+                      color: #64748b;
+                      margin-bottom: 20px;">
+                Last edited:
+                @SelectedNote.LastEdited.ToString("MMMM dd, yyyy h:mm tt")
+            </p>
+
+            <div style="border-top: 2px solid #2563eb;
+                        margin-bottom: 25px;">
+            </div>
+
+            <table style="width: 100%;
+                          border-collapse: collapse;
+                          table-layout: fixed;
+                          font-size: 15px;">
+
+                <thead>
+                    <tr>
+                        @foreach (var column in columns)
+                        {
+                            <th style="background: #172554;
+                                       color: #ffffff;
+                                       border: 1px solid #cbd5e1;
+                                       padding: 14px;
+                                       text-align: left;
+                                       overflow-wrap: anywhere;">
+
+                                @(string.IsNullOrWhiteSpace(column)
+                                    ? "Untitled Column"
+                                    : column)
+
+                            </th>
+                        }
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @for (int r = 0; r < rows.Count; r++)
+                    {
+                        var exportRow = rows[r];
+
+                        <tr style="background: @(r % 2 == 0 ? "#ffffff" : "#f8fafc");">
+
+                            @foreach (var cell in exportRow.Cells)
+                            {
+                                <td style="border: 1px solid #cbd5e1;
+                                           padding: 14px;
+                                           vertical-align: top;
+                                           line-height: 1.6;
+                                           white-space: pre-wrap;
+                                           overflow-wrap: anywhere;">@cell</td>
+                            }
+
+                        </tr>
+                    }
+
+                    @if (rows.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="@columns.Count"
+                                style="border: 1px solid #cbd5e1;
+                                       padding: 20px;
+                                       color: #64748b;
+                                       text-align: center;">
+                                No chart entries.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <div style="border-top: 1px solid #e2e8f0;
+                        margin-top: 35px;
+                        padding-top: 15px;
+                        text-align: center;
+                        color: #64748b;
+                        font-size: 12px;">
+                Exported from BYUNotes
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public ChartingNote SelectedNote { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    private List<string> columns = new();
+    private List<ChartingRow> rows = new();
+
+    private string saveStatus = "Saved";
+
+    private ChartingNote? loadedNote;
+
+    protected override void OnParametersSet()
+    {
+        if (SelectedNote is null ||
+            ReferenceEquals(loadedNote, SelectedNote))
+        {
+            return;
+        }
+
+        loadedNote = SelectedNote;
+
+        columns = DeserializeList<string>(
+            SelectedNote.ColumnsJson);
+
+        rows = DeserializeList<ChartingRow>(
+            SelectedNote.RowsJson);
+
+        // Default headings for a new chart.
+        if (columns.Count == 0)
+        {
+            columns = new List<string>
+            {
+                "Topic",
+                "Definition",
+                "Example"
+            };
+
+            if (rows.Count == 0)
+            {
+                rows.Add(new ChartingRow
+                {
+                    Cells = new List<string>
+                    {
+                        "",
+                        "",
+                        ""
+                    }
+                });
+            }
+        }
+
+        NormalizeRows();
+        SyncNoteData();
+
+        saveStatus = "Saved";
+    }
+
+    private static List<T> DeserializeList<T>(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return new List<T>();
+        }
+
+        return JsonSerializer.Deserialize<List<T>>(json)
+            ?? new List<T>();
+    }
+
+    private void NormalizeRows()
+    {
+        foreach (var row in rows)
+        {
+            while (row.Cells.Count < columns.Count)
+            {
+                row.Cells.Add("");
+            }
+
+            while (row.Cells.Count > columns.Count)
+            {
+                row.Cells.RemoveAt(row.Cells.Count - 1);
+            }
+        }
+    }
+
+    private void UpdateColumn(int index, string? value)
+    {
+        columns[index] = value ?? "";
+
+        OnNoteChanged();
+    }
+
+    private void UpdateCell(
+        int rowIndex,
+        int columnIndex,
+        string? value)
+    {
+        rows[rowIndex].Cells[columnIndex] = value ?? "";
+
+        OnNoteChanged();
+    }
+
+    private async Task AddColumnAsync()
+    {
+        columns.Add($"Column {columns.Count + 1}");
+
+        foreach (var row in rows)
+        {
+            row.Cells.Add("");
+        }
+
+        OnNoteChanged();
+
+        await SaveNoteAsync();
+    }
+
+    private async Task DeleteColumnAsync(int index)
+    {
+        if (columns.Count <= 1)
+        {
+            return;
+        }
+
+        columns.RemoveAt(index);
+
+        foreach (var row in rows)
+        {
+            row.Cells.RemoveAt(index);
+        }
+
+        OnNoteChanged();
+
+        await SaveNoteAsync();
+    }
+
+    private async Task AddRowAsync()
+    {
+        rows.Add(new ChartingRow
+        {
+            Cells = Enumerable.Repeat("", columns.Count).ToList()
+        });
+
+        OnNoteChanged();
+
+        await SaveNoteAsync();
+    }
+
+    private async Task DeleteRowAsync(int index)
+    {
+        rows.RemoveAt(index);
+
+        OnNoteChanged();
+
+        await SaveNoteAsync();
+    }
+
+    private void SyncNoteData()
+    {
+        if (SelectedNote is null)
+        {
+            return;
+        }
+
+        SelectedNote.ColumnsJson =
+            JsonSerializer.Serialize(columns);
+
+        SelectedNote.RowsJson =
+            JsonSerializer.Serialize(rows);
+    }
+
+    private void OnNoteChanged()
+    {
+        SyncNoteData();
+
+        saveStatus = "Unsaved";
+    }
+
+    private async Task SaveNoteAsync()
+    {
+        if (SelectedNote is null)
+        {
+            return;
+        }
+
+        saveStatus = "Saving";
+
+        try
+        {
+            SyncNoteData();
+
+            SelectedNote.LastEdited = DateTime.Now;
+
+            await NoteService.SaveNoteAsync(SelectedNote);
+
+            saveStatus = "Saved";
+        }
+        catch (Exception ex)
+        {
+            saveStatus = "Error";
+
+            Console.WriteLine(
+                $"CHARTING NOTE SAVE ERROR: {ex}");
+        }
+    }
+}
