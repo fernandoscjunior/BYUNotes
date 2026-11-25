@@ -71,6 +71,21 @@ namespace BYUNotes.Web.Migrations
                     b.UseTphMappingStrategy();
                 });
 
+            modelBuilder.Entity("BYUNotes.Web.Models.ChartingNote", b =>
+                {
+                    b.HasBaseType("BYUNotes.Web.Models.Note");
+
+                    b.Property<string>("ColumnsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RowsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasDiscriminator().HasValue("ChartingNote");
+                });
+
             modelBuilder.Entity("BYUNotes.Web.Models.CornellNote", b =>
                 {
                     b.HasBaseType("BYUNotes.Web.Models.Note");
@@ -80,6 +95,21 @@ namespace BYUNotes.Web.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasDiscriminator().HasValue("CornellNote");
+                });
+
+            modelBuilder.Entity("BYUNotes.Web.Models.MappingNote", b =>
+                {
+                    b.HasBaseType("BYUNotes.Web.Models.Note");
+
+                    b.Property<string>("BranchesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CentralTopic")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasDiscriminator().HasValue("MappingNote");
                 });
 
             modelBuilder.Entity("BYUNotes.Web.Models.OutlineNote", b =>

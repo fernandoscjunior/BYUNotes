@@ -1,4 +1,5 @@
-﻿@page "/"
+﻿
+@page "/"
 @using System.Linq
 @using BYUNotes.Web.Components.Pages.Notes
 @using BYUNotes.Web.Models
@@ -18,6 +19,7 @@
     <!-- LEFT PANEL: NOTES LIST -->
     <div class="col-md-4">
         <div class="card p-3 h-100">
+
             <h3>My Notes</h3>
             <hr />
 
@@ -49,94 +51,213 @@
 
                         <strong>@note.Title</strong>
                         <br />
+
                         <small>
                             Edited: @note.LastEdited.ToString("MMM dd, yyyy h:mm tt")
                         </small>
+
                     </button>
                 }
             }
 
             <hr />
 
-            
-                <label class="form-label">
-                    Note Type
-                </label>
+            <label class="form-label">
+                Note Type
+            </label>
 
-                <select class="form-select mb-2"
-                        @bind="newNoteType">
-                    <option value="Text">Text Note</option>
-                    <option value="Cornell">Cornell Notes</option>
-                    <option value="Outline">Outline Notes</option>
-                </select>
+            <select class="form-select mb-2"
+                    @bind="newNoteType">
 
+                <option value="Text">Text Note</option>
+                <option value="Cornell">Cornell Notes</option>
+                <option value="Outline">Outline Notes</option>
+                <option value="Mapping">Mapping Notes</option>
+                <option value="Charting">Charting Notes</option>
+
+            </select>
 
             <button type="button"
                     class="btn btn-success"
                     @onclick="CreateNoteAsync">
+
                 + New Note
+
             </button>
+
         </div>
     </div>
+
     <!-- RIGHT PANEL: NOTE EDITOR -->
     <div class="col-md-8">
         <div class="card p-3 h-100">
+
             @if (selectedNote is not null)
             {
-                
-            if (selectedNote is CornellNote cornellNote)
-            {
-                <CornellNoteComponent SelectedNote="cornellNote"
-                                    OnDelete="DeleteNoteAsync" />
-            }
-            else if (selectedNote is TextNote textNote)
-            {
-                <TextNoteComponent SelectedNote="textNote"
-                                OnDelete="DeleteNoteAsync" />
-            }
-            else if (selectedNote is OutlineNote outlineNote)
-            {
-                <OutlineNoteComponent
-                    @key="outlineNote.Id"
-                    SelectedNote="outlineNote"
-                    OnDelete="DeleteNoteAsync" />
-            }
+                <!-- UNIVERSAL EXPORT MENU -->
+                <div class="d-flex justify-content-end mb-3">
 
-                 <!-- EXPORT BUTTONS -->
-                <div class="d-flex gap-2 mb-3">
-                    <button type="button"
-                            class="btn btn-outline-primary"
-                            @onclick="() => ExportNoteAsync(false)">
-                        Export .txt
-                    </button>
+                    <div class="dropdown">
 
-                    <button type="button"
-                            class="btn btn-outline-success"
-                            @onclick="() => ExportNoteAsync(true)">
-                        Export .md
-                    </button>
+                        <button type="button"
+                                class="btn btn-outline-primary dropdown-toggle"
+                                disabled="@isExporting"
+                                aria-expanded="@(showExportMenu ? "true" : "false")"
+                                @onclick="ToggleExportMenu">
+
+                            <i class="bi bi-download me-1"></i>
+
+                            @(isExporting ? "Exporting..." : "Export Note")
+
+                        </button>
+
+                        @if (showExportMenu)
+                        {
+                            <div class="dropdown-menu dropdown-menu-end show shadow"
+                                 style="right: 0; left: auto; min-width: 230px;">
+
+                                <h6 class="dropdown-header">
+                                    Text Formats
+                                </h6>
+
+                                <button type="button"
+                                        class="dropdown-item"
+                                        @onclick='() => ExportNoteAsync("txt")'>
+
+                                    <i class="bi bi-file-text me-2"></i>
+                                    Plain Text (.txt)
+
+                                </button>
+
+                                <button type="button"
+                                        class="dropdown-item"
+                                        @onclick='() => ExportNoteAsync("md")'>
+
+                                    <i class="bi bi-markdown me-2"></i>
+                                    Markdown (.md)
+
+                                </button>
+
+                                <div class="dropdown-divider"></div>
+
+                                <h6 class="dropdown-header">
+                                    Visual Formats
+                                </h6>
+
+                                <button type="button"
+                                        class="dropdown-item"
+                                        @onclick='() => ExportNoteAsync("png")'>
+
+                                    <i class="bi bi-image me-2"></i>
+                                    Image (.png)
+
+                                </button>
+
+                                <button type="button"
+                                        class="dropdown-item"
+                                        @onclick='() => ExportNoteAsync("pdf")'>
+
+                                    <i class="bi bi-file-earmark-pdf me-2"></i>
+                                    PDF Document (.pdf)
+
+                                </button>
+
+                                <button type="button"
+                                        class="dropdown-item"
+                                        @onclick='() => ExportNoteAsync("html")'>
+
+                                    <i class="bi bi-globe me-2"></i>
+                                    Web Page (.html)
+
+                                </button>
+
+                            </div>
+                        }
+
+                    </div>
+
                 </div>
+
+                @if (!string.IsNullOrWhiteSpace(exportError))
+                {
+                    <div class="alert alert-danger" role="alert">
+                        @exportError
+                    </div>
+                }
+
+                <!-- CORNELL NOTES -->
+                @if (selectedNote is CornellNote cornellNote)
+                {
+                    <CornellNoteComponent
+                        @key="cornellNote.Id"
+                        SelectedNote="cornellNote"
+                        OnDelete="DeleteNoteAsync" />
+                }
+
+                <!-- TEXT NOTES -->
+                else if (selectedNote is TextNote textNote)
+                {
+                    <TextNoteComponent
+                        @key="textNote.Id"
+                        SelectedNote="textNote"
+                        OnDelete="DeleteNoteAsync" />
+                }
+
+                <!-- OUTLINE NOTES -->
+                else if (selectedNote is OutlineNote outlineNote)
+                {
+                    <OutlineNoteComponent
+                        @key="outlineNote.Id"
+                        SelectedNote="outlineNote"
+                        OnDelete="DeleteNoteAsync" />
+                }
+
+                <!-- MAPPING NOTES -->
+                else if (selectedNote is MappingNote mappingNote)
+                {
+                    <MappingNoteComponent
+                        @key="mappingNote.Id"
+                        SelectedNote="mappingNote"
+                        OnDelete="DeleteNoteAsync" />
+                }
+
+                <!-- CHARTING NOTES -->
+                else if (selectedNote is ChartingNote chartingNote)
+                {
+                    <ChartingNoteComponent
+                        @key="chartingNote.Id"
+                        SelectedNote="chartingNote"
+                        OnDelete="DeleteNoteAsync" />
+                }
             }
             else
             {
                 <h5>Select a note</h5>
+
                 <p>
                     Choose a note from the left panel
                     or create a new one.
                 </p>
             }
-    </div>
-</div>            
-</div>
 
+        </div>
+    </div>
+
+</div>
 
 @code {
 
     private List<Note> notes = new();
 
     private Note? selectedNote;
+
     private string newNoteType = "Text";
     private string searchText = "";
+
+    private bool showExportMenu = false;
+    private bool isExporting = false;
+
+    private string exportError = "";
 
     private IEnumerable<Note> filteredNotes =>
         notes.Where(note =>
@@ -151,7 +272,8 @@
 
     private async Task LoadNotesAsync()
     {
-        notes= await NoteService.LoadNotesAsync();
+        notes = await NoteService.LoadNotesAsync();
+
         if (notes.Count > 0)
             selectedNote = notes[0];
     }
@@ -159,28 +281,33 @@
     private void SelectNote(Note note)
     {
         selectedNote = note;
-        
+
+        showExportMenu = false;
+        exportError = "";
     }
 
-    
-        private async Task CreateNoteAsync()
+    private async Task CreateNoteAsync()
+    {
+        Note note = newNoteType switch
         {
-            Note note = newNoteType switch
-            {
-                "Cornell" => new CornellNote(),
-                "Outline" => new OutlineNote(),
-                _ => new TextNote()
-            };
+            "Cornell" => new CornellNote(),
+            "Outline" => new OutlineNote(),
+            "Mapping" => new MappingNote(),
+            "Charting" => new ChartingNote(),
+            _ => new TextNote()
+        };
 
-            note.Title = "Untitled Note";
+        note.Title = "Untitled Note";
 
-            await NoteService.CreateNoteAsync(note);
+        await NoteService.CreateNoteAsync(note);
 
-            notes.Insert(0, note);
-            selectedNote = note;
+        notes.Insert(0, note);
 
-            
-        }
+        selectedNote = note;
+
+        showExportMenu = false;
+        exportError = "";
+    }
 
     private async Task DeleteNoteAsync()
     {
@@ -192,14 +319,40 @@
         notes.Remove(selectedNote);
 
         selectedNote = notes.FirstOrDefault();
+
+        showExportMenu = false;
+        exportError = "";
     }
 
-
-    private async Task ExportNoteAsync(bool markdown)
+    private void ToggleExportMenu()
     {
-        await ExportNoteService.ExportNoteAsync(markdown, selectedNote);
+        showExportMenu = !showExportMenu;
     }
 
+    private async Task ExportNoteAsync(string format)
+    {
+        if (selectedNote is null || isExporting)
+            return;
 
+        showExportMenu = false;
+        isExporting = true;
+        exportError = "";
+
+        try
+        {
+            await ExportNoteService.ExportNoteAsync(
+                format,
+                selectedNote);
+        }
+        catch (Exception ex)
+        {
+            exportError = $"Export failed: {ex.Message}";
+
+            Console.WriteLine($"NOTE EXPORT ERROR: {ex}");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
 }
-

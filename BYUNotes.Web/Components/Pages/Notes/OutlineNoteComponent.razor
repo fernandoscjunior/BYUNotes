@@ -1,26 +1,34 @@
 
 @using BYUNotes.Web.Models
 @using BYUNotes.Web.Services
+
 @inject NoteService NoteService
 
 <div class="d-flex justify-content-between align-items-center">
+
     <h3 class="mb-0">Outline Note Editor</h3>
 
     <div class="d-flex align-items-center gap-3">
+
         <span class="text-muted">@saveStatus</span>
 
         <button type="button"
                 class="btn btn-outline-danger btn-sm"
                 title="Delete note"
                 @onclick="() => OnDelete.InvokeAsync()">
+
             <i class="bi bi-trash"></i> Delete
+
         </button>
+
     </div>
+
 </div>
 
 <hr />
 
 <label class="form-label">Title</label>
+
 <input class="form-control mb-3"
        @bind="SelectedNote.Title"
        @bind:event="oninput"
@@ -29,20 +37,23 @@
 
 <h5>Outline</h5>
 
-
 <div class="row g-3 mb-3">
 
-    <!-- LEFT: Outline Editor -->
+    <!-- LEFT: OUTLINE EDITOR -->
     <div class="col-md-6">
+
         <div class="card h-100">
+
             <div class="card-header">
                 <strong>Edit Outline</strong>
             </div>
 
             <div class="card-body">
+
                 <p class="text-muted small">
                     Use # for headings, ## for subheadings,
                     and - for bullet points.
+                    Add spaces before bullets to create nested levels.
                 </p>
 
                 <textarea class="form-control mb-3"
@@ -51,40 +62,62 @@
                           @bind="SelectedNote.Content"
                           @bind:event="oninput"
                           @bind:after="OnNoteChanged"
-                          @onblur="SaveNoteAsync">
-                </textarea>
+                          @onblur="SaveNoteAsync"></textarea>
 
                 <div class="d-flex flex-wrap gap-2">
+
                     <button type="button"
                             class="btn btn-outline-primary btn-sm"
                             @onclick='() => InsertText("# Heading")'>
+
                         + Heading
+
                     </button>
 
                     <button type="button"
                             class="btn btn-outline-secondary btn-sm"
                             @onclick='() => InsertText("## Subheading")'>
+
                         + Subheading
+
                     </button>
 
                     <button type="button"
                             class="btn btn-outline-secondary btn-sm"
                             @onclick='() => InsertText("- Bullet point")'>
+
                         + Bullet
+
                     </button>
+
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            @onclick='() => InsertText("    - Nested bullet")'>
+
+                        + Nested Bullet
+
+                    </button>
+
                 </div>
+
             </div>
+
         </div>
+
     </div>
 
-    <!-- RIGHT: Live Preview -->
+    <!-- RIGHT: LIVE PREVIEW -->
     <div class="col-md-6">
+
         <div class="card h-100">
+
             <div class="card-header">
                 <strong>Live Preview</strong>
             </div>
 
-            <div class="card-body">
+            <div class="card-body"
+                 style="overflow-wrap: anywhere;">
+
                 @if (string.IsNullOrWhiteSpace(SelectedNote.Content))
                 {
                     <p class="text-muted">
@@ -93,109 +126,106 @@
                 }
                 else
                 {
-                    @foreach (var line in SelectedNote.Content.Split('\n'))
-                    {
-                        var text = line.Trim();
-
-                        if (text.StartsWith("## "))
-                        {
-                            <h5 class="ms-3 mt-3">
-                                @text.Substring(3)
-                            </h5>
-                        }
-                        else if (text.StartsWith("# "))
-                        {
-                            <h4 class="mt-3">
-                                @text.Substring(2)
-                            </h4>
-                        }
-                        else if (text.StartsWith("- "))
-                        {
-                            <div class="ms-4 mb-1">
-                                • @text.Substring(2)
-                            </div>
-                        }
-                        else if (!string.IsNullOrWhiteSpace(text))
-                        {
-                            <p class="ms-3 mb-2">@text</p>
-                        }
-                    }
+                    @RenderOutline()
                 }
+
             </div>
+
         </div>
+
     </div>
 
-</div>
-
-
-<textarea class="form-control mb-3"
-          rows="14"
-          placeholder="Start writing your outline here..."
-          @bind="SelectedNote.Content"
-          @bind:event="oninput"
-          @bind:after="OnNoteChanged"
-          @onblur="SaveNoteAsync">
-</textarea>
-
-<div class="d-flex gap-2 mb-3">
-    <button class="btn btn-outline-primary btn-sm"
-            @onclick='() => InsertText("# Heading")'>
-        + Heading
-    </button>
-
-    <button class="btn btn-outline-secondary btn-sm"
-            @onclick='() => InsertText("## Subheading")'>
-        + Subheading
-    </button>
-
-    <button class="btn btn-outline-secondary btn-sm"
-            @onclick='() => InsertText("- Bullet point")'>
-        + Bullet
-    </button>
-</div>
-
-<div class="card mt-3 mb-3">
-    <div class="card-header">
-        <strong>Outline Preview</strong>
-    </div>
-
-    <div class="card-body">
-        @foreach (var line in SelectedNote.Content.Split('\n'))
-        {
-            var text = line.Trim();
-
-            if (text.StartsWith("## "))
-            {
-                <h5 class="ms-4 mt-3">
-                    @text.Substring(3)
-                </h5>
-            }
-            else if (text.StartsWith("# "))
-            {
-                <h4 class="mt-3">
-                    @text.Substring(2)
-                </h4>
-            }
-            else if (text.StartsWith("- "))
-            {
-                <div class="ms-5 mb-1">
-                    • @text.Substring(2)
-                </div>
-            }
-            else if (!string.IsNullOrWhiteSpace(text))
-            {
-                <p class="ms-4 mb-2">@text</p>
-            }
-        }
-    </div>
 </div>
 
 <p class="text-muted small">
+
     Last edited:
     @SelectedNote.LastEdited.ToString("MMM dd, yyyy h:mm tt")
+
 </p>
 
+<!-- OUTLINE EXPORT PREVIEW -->
+<div aria-hidden="true"
+     style="position: fixed;
+            left: -10000px;
+            top: 0;
+            pointer-events: none;">
+
+    <div id="note-export-preview"
+         style="width: 800px;
+                min-height: 400px;
+                padding: 40px;
+                box-sizing: border-box;
+                background: #ffffff;
+                color: #212529;
+                font-family: Arial, sans-serif;">
+
+        <!-- DOCUMENT HEADER -->
+        <div style="color: #64748b;
+                    font-size: 13px;
+                    font-weight: bold;
+                    letter-spacing: 1px;
+                    margin-bottom: 15px;">
+
+            BYUNOTES | OUTLINE NOTES
+
+        </div>
+
+        <!-- NOTE TITLE -->
+        <h1 style="font-size: 32px;
+                   font-weight: bold;
+                   color: #172554;
+                   overflow-wrap: anywhere;
+                   margin-bottom: 10px;">
+
+            @(string.IsNullOrWhiteSpace(SelectedNote.Title)
+                ? "Untitled Note"
+                : SelectedNote.Title)
+
+        </h1>
+
+        <!-- LAST EDITED -->
+        <p style="font-size: 13px;
+                  color: #64748b;
+                  margin-bottom: 20px;">
+
+            Last edited:
+            @SelectedNote.LastEdited.ToString("MMMM dd, yyyy h:mm tt")
+
+        </p>
+
+        <div style="border-top: 2px solid #2563eb;
+                    margin-bottom: 25px;">
+        </div>
+
+        <!-- FORMATTED OUTLINE -->
+        <div style="font-size: 16px;
+                    line-height: 1.8;
+                    min-height: 200px;
+                    overflow-wrap: anywhere;">
+
+            @RenderOutline()
+
+        </div>
+
+        <!-- DOCUMENT FOOTER -->
+        <div style="border-top: 1px solid #e2e8f0;
+                    margin-top: 35px;
+                    padding-top: 15px;
+                    text-align: center;
+                    color: #64748b;
+                    font-size: 12px;">
+
+            Exported from BYUNotes
+
+        </div>
+
+    </div>
+
+</div>
+
 @code {
+
     [Parameter, EditorRequired]
     public OutlineNote SelectedNote { get; set; } = null!;
 
@@ -203,6 +233,81 @@
     public EventCallback OnDelete { get; set; }
 
     private string saveStatus = "Saved";
+
+    // Shared formatting for live preview and visual exports
+    private RenderFragment RenderOutline() => @<div>
+
+        @foreach (var line in
+            (SelectedNote.Content ?? "").Split('\n'))
+        {
+            var normalizedLine = line.Replace("\t", "    ");
+
+            var text = normalizedLine.Trim();
+
+            var leadingSpaces =
+                normalizedLine.Length -
+                normalizedLine.TrimStart().Length;
+
+            var indentLevel = Math.Min(leadingSpaces / 4, 6);
+
+            var indentation = indentLevel * 24;
+
+            if (text.StartsWith("## "))
+            {
+                <h5 style="font-size: 18px;
+                           font-weight: bold;
+                           color: inherit;
+                           margin-top: 18px;
+                           margin-bottom: 8px;
+                           margin-left: @(20 + indentation)px;">
+
+                    @text.Substring(3)
+
+                </h5>
+            }
+            else if (text.StartsWith("# "))
+            {
+                <h4 style="font-size: 22px;
+                           font-weight: bold;
+                           color: inherit;
+                           margin-top: 22px;
+                           margin-bottom: 10px;
+                           margin-left: @(indentation)px;">
+
+                    @text.Substring(2)
+
+                </h4>
+            }
+            else if (text.StartsWith("- "))
+            {
+                <div style="margin-left: @(40 + indentation)px;
+                            margin-bottom: 5px;
+                            line-height: 1.7;
+                            overflow-wrap: anywhere;">
+
+                    @(indentLevel == 0 ? "•" : "◦")
+                    @text.Substring(2)
+
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(text))
+            {
+                <p style="margin-left: @(20 + indentation)px;
+                          margin-bottom: 8px;
+                          line-height: 1.7;
+                          overflow-wrap: anywhere;">
+
+                    @text
+
+                </p>
+            }
+            else
+            {
+                <div style="height: 10px;"></div>
+            }
+        }
+
+    </div>;
 
     private void OnNoteChanged()
     {
@@ -218,6 +323,7 @@
             + text;
 
         OnNoteChanged();
+
         await SaveNoteAsync();
     }
 
@@ -228,12 +334,16 @@
         try
         {
             SelectedNote.LastEdited = DateTime.Now;
+
             await NoteService.SaveNoteAsync(SelectedNote);
+
             saveStatus = "Saved";
         }
-        catch
+        catch (Exception ex)
         {
             saveStatus = "Save failed";
+
+            Console.WriteLine($"OUTLINE SAVE ERROR: {ex}");
         }
     }
 }

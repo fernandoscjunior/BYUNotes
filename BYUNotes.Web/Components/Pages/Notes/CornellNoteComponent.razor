@@ -1,3 +1,4 @@
+
 @using System.Linq
 @using BYUNotes.Web.Models
 @using BYUNotes.Web.Services
@@ -6,122 +7,491 @@
 @inject ExportNoteService ExportNoteService
 @inject IJSRuntime JS
 
+<div class="d-flex justify-content-between align-items-center">
+    <h3 class="mb-0">Cornell Note Editor</h3>
 
-            <div class="d-flex justify-content-between align-items-center"> 
-                <h3 class="mb-0">Note Editor</h3>
-                <div class="d-flex align-items-center gap-3">
-                    @if (saveStatus == "Saved")
+    <div class="d-flex align-items-center gap-3">
+
+        @if (saveStatus == "Saved")
+        {
+            <span class="text-success">
+                <i class="bi bi-check-circle"></i> Saved
+            </span>
+        }
+        else if (saveStatus == "Saving")
+        {
+            <span class="text-muted">
+                <span class="spinner-border spinner-border-sm"></span>
+                Saving...
+            </span>
+        }
+        else if (saveStatus == "Error")
+        {
+            <span class="text-danger">
+                <i class="bi bi-exclamation-circle"></i> Save failed
+            </span>
+        }
+        else
+        {
+            <span class="text-muted">
+                <i class="bi bi-pencil"></i> Unsaved changes
+            </span>
+        }
+
+        <button type="button"
+                class="btn btn-outline-danger btn-sm"
+                @onclick="() => OnDelete.InvokeAsync()">
+            <i class="bi bi-trash"></i> Delete
+        </button>
+
+    </div>
+</div>
+
+<hr />
+
+@if (selectedNote is not null)
+{
+    <label class="form-label">Title</label>
+
+    <input class="form-control mb-3"
+           @ref="titleInput"
+           @bind="selectedNote.Title"
+           @bind:event="oninput"
+           @bind:after="OnNoteChanged"
+           @onblur="SaveNoteAsync" />
+
+    <div class="row g-3 mb-3">
+
+        <!-- LEFT SIDE: EDITOR -->
+
+        <div class="col-lg-6">
+            <div class="card h-100">
+
+                <div class="card-header">
+                    <strong>Edit Cornell Notes</strong>
+                </div>
+
+                <div class="card-body">
+
+                    <p class="text-muted small">
+                        Add questions, keywords, and detailed notes.
+                        Summarize the main ideas at the bottom.
+                    </p>
+
+                    @if (selectedNote.Cues.Count == 0)
                     {
-                        <span class="text-success">
-                            <i class="bi bi-check-circle"></i> Saved
-                        </span>
+                        <p class="text-muted">
+                            Click Add Row to begin your Cornell notes.
+                        </p>
                     }
-                    else if (saveStatus == "Saving")
+
+                    @foreach (var cue in selectedNote.Cues.OrderBy(n => n.CueSequence))
                     {
-                        <span class="text-muted">
-                            <span class="spinner-border spinner-border-sm"></span>
-                            Saving...
-                        </span>
+                        <div class="border rounded p-3 mb-3"
+                             @key="cue.Id">
+
+                            <label class="form-label">
+                                <strong>Cue / Question</strong>
+                            </label>
+
+                            <textarea class="form-control mb-3"
+                                      rows="3"
+                                      placeholder="Enter a question or keyword..."
+                                      @bind="cue.Cue"
+                                      @bind:event="oninput"
+                                      @bind:after="OnNoteChanged"
+                                      @onblur="SaveNoteAsync"></textarea>
+
+                            <label class="form-label">
+                                <strong>Main Notes</strong>
+                            </label>
+
+                            <textarea class="form-control mb-2"
+                                      rows="5"
+                                      placeholder="Write your detailed notes..."
+                                      @ref="contentInput"
+                                      @bind="cue.Content"
+                                      @bind:event="oninput"
+                                      @bind:after="OnNoteChanged"
+                                      @onblur="SaveNoteAsync"></textarea>
+
+                            <div class="text-end">
+                                <button type="button"
+                                        class="btn btn-outline-danger btn-sm"
+                                        @onclick="() => RemoveDetail(cue)">
+                                    <i class="bi bi-trash"></i> Remove
+                                </button>
+                            </div>
+
+                        </div>
                     }
-                    else if (saveStatus == "Error")
-                    {
-                        <span class="text-danger">
-                            <i class="bi bi-exclamation-circle"></i> Save failed
-                        </span>
-                    }
-                    else {
-                        <span class="text-muted">
-                            <i class="bi bi-pencil"></i> Unsaved changes
-                        </span>
-                    }
+
                     <button type="button"
-                            class="border-0 bg-transparent text-danger"
-                            @onclick="() => OnDelete.InvokeAsync()">
-                        <i class="bi bi-trash"></i>
+                            class="btn btn-outline-success btn-sm mb-3"
+                            @onclick="AddDetail">
+                        <i class="bi bi-plus-lg"></i> Add Row
                     </button>
+
+                    <hr />
+
+                    <label class="form-label">
+                        <strong>Summary</strong>
+                    </label>
+
+                    <textarea class="form-control"
+                              rows="4"
+                              placeholder="Summarize what you learned..."
+                              @bind="selectedNote.Summary"
+                              @bind:event="oninput"
+                              @bind:after="OnNoteChanged"
+                              @onblur="SaveNoteAsync"></textarea>
+
                 </div>
             </div>
-            <hr />
-    @if (selectedNote is not null)
-            {
-                <label class="form-label">Title</label>
+        </div>
 
-                <input class="form-control mb-3"
-                        @ref="titleInput"
-                       @bind="selectedNote.Title"
-                            @bind:event="oninput"
-                            @bind:after="OnNoteChanged"
-                            @onblur="SaveNoteAsync" />
+        <!-- RIGHT SIDE: LIVE PREVIEW -->
 
-                @* <p class="text-muted">
-                    Type: @selectedNote.Type
-                </p> *@
+        <div class="col-lg-6">
+            <div class="card h-100">
 
-                    <h5>Cornell Notes</h5>
+                <div class="card-header">
+                    <strong>Live Preview</strong>
+                </div>
 
-                    <label class="form-label">
-                        Cues / Questions
-                    </label>
-            @foreach(var cue in selectedNote.Cues.OrderBy(n => n.CueSequence))
-            {
-                <div @key="cue.Id">
-                    <textarea class="form-control mb-3"
-                              rows="3"
-                            @bind="cue.Cue"
-                            @bind:event="oninput"
-                            @bind:after="OnNoteChanged"
-                            @onblur="SaveNoteAsync"></textarea>
+                <div class="card-body">
 
-                    <label class="form-label">
-                        Main Notes
-                    </label>
+                    <!-- Cornell notebook paper -->
 
-                    <textarea class="form-control mb-3"
-                              rows="6"
-                            @ref="contentInput"
-                            @bind="cue.Content"
-                            @bind:event="oninput"
-                            @bind:after="OnNoteChanged"
-                            @onblur="SaveNoteAsync"></textarea>
-                                            </div>
-              <div>
-              <button type="button"
-                        class="btn btn-success"
-                        @onclick="AddDetail">
-                    <i class="bi bi-plus-lg"></i>
-                </button>
-            <button type="button"
-                    class="btn btn-outline-danger btn-sm"
-                    @onclick="() => RemoveDetail(cue)">
-                <i class="bi bi-trash"></i>
-            </button>
+                    <div style="background: #ffffff;
+                                color: #212529;
+                                border: 2px solid #64748b;
+                                border-radius: 4px;
+                                overflow: hidden;
+                                box-shadow: 0 3px 8px rgba(0,0,0,0.08);">
+
+                        <!-- Paper heading -->
+
+                        <div class="text-center p-3"
+                             style="background: #eaf0f8;
+                                    border-bottom: 2px solid #64748b;">
+
+                            <h5 class="mb-1"
+                                style="overflow-wrap: anywhere;">
+                                @selectedNote.Title
+                            </h5>
+
+                            <small class="text-muted">
+                                CORNELL NOTES
+                            </small>
+
+                        </div>
+
+                        <!-- Column headings -->
+
+                        <div class="row g-0"
+                             style="border-bottom: 1px solid #64748b;">
+
+                            <div class="col-4 p-2"
+                                 style="background: #f1f5f9;
+                                        border-right: 2px solid #64748b;">
+
+                                <strong>Cues / Questions</strong>
+
+                            </div>
+
+                            <div class="col-8 p-2">
+
+                                <strong>Main Notes</strong>
+
+                            </div>
+
+                        </div>
+
+                        <!-- Empty notebook preview -->
+
+                        @if (selectedNote.Cues.Count == 0)
+                        {
+                            <div class="row g-0">
+
+                                <div class="col-4 p-3"
+                                     style="min-height: 300px;
+                                            background: #f8fafc;
+                                            border-right: 2px solid #64748b;">
+
+                                    <small class="text-muted">
+                                        Questions and keywords
+                                    </small>
+
+                                </div>
+
+                                <div class="col-8 p-3"
+                                     style="min-height: 300px;
+                                            line-height: 28px;
+                                            background-image: repeating-linear-gradient(
+                                            white 0px,
+                                            white 27px,
+                                            #dbe3ee 27px,
+                                            #dbe3ee 28px);">
+
+                                    <small class="text-muted">
+                                        Your notes will appear here.
+                                    </small>
+
+                                </div>
+
+                            </div>
+                        }
+
+                        <!-- Live note content -->
+
+                        @foreach (var cue in selectedNote.Cues.OrderBy(n => n.CueSequence))
+                        {
+                            <div class="row g-0"
+                                 style="border-bottom: 1px solid #94a3b8;"
+                                 @key="cue.Id">
+
+                                <!-- Narrow cue column -->
+
+                                <div class="col-4 p-3"
+                                     style="background: #f8fafc;
+                                            border-right: 2px solid #64748b;
+                                            white-space: pre-wrap;
+                                            overflow-wrap: anywhere;"><strong>@cue.Cue</strong></div>
+
+                                <!-- Wide notes column -->
+
+                                <div class="col-8 p-3"
+                                     style="min-height: 168px;
+                                            line-height: 28px;
+                                            white-space: pre-wrap;
+                                            overflow-wrap: anywhere;
+                                            background-image: repeating-linear-gradient(
+                                            white 0px,
+                                            white 27px,
+                                            #dbe3ee 27px,
+                                            #dbe3ee 28px);
+                                            background-position: 0 16px;">@cue.Content</div>
+
+                            </div>
+                        }
+
+                        <!-- Full-width summary -->
+
+                        <div class="p-3"
+                             style="border-top: 2px solid #64748b;
+                                    min-height: 140px;
+                                    background: #f8fafc;">
+
+                            <strong>Summary</strong>
+
+                            @if (string.IsNullOrWhiteSpace(selectedNote.Summary))
+                            {
+                                <p class="text-muted mt-2">
+                                    Your summary will appear here.
+                                </p>
+                            }
+                            else
+                            {
+                                <div class="mt-2"
+                                     style="white-space: pre-wrap;
+                                            overflow-wrap: anywhere;">@selectedNote.Summary</div>
+                            }
+
+                        </div>
+
+                    </div>
+
+                </div>
             </div>
+        </div>
+
+    </div>
+
+    
+    <p class="text-muted small">
+        Last edited:
+        @selectedNote.LastEdited.ToString("MMM dd, yyyy h:mm tt")
+    </p>
+
+    <!-- CORNELL EXPORT PREVIEW -->
+    <div aria-hidden="true"
+         style="position: fixed;
+                left: -10000px;
+                top: 0;
+                pointer-events: none;">
+
+        <div id="note-export-preview"
+             style="width: 800px;
+                    min-height: 400px;
+                    padding: 40px;
+                    box-sizing: border-box;
+                    background: #ffffff;
+                    color: #212529;
+                    font-family: Arial, sans-serif;">
+
+            <!-- DOCUMENT HEADER -->
+            <div style="color: #64748b;
+                        font-size: 13px;
+                        font-weight: bold;
+                        letter-spacing: 1px;
+                        margin-bottom: 15px;">
+
+                BYUNOTES | CORNELL NOTES
+
+            </div>
+
+            <!-- NOTE TITLE -->
+            <h1 style="font-size: 32px;
+                       font-weight: bold;
+                       color: #172554;
+                       overflow-wrap: anywhere;
+                       margin-bottom: 10px;">
+
+                @(string.IsNullOrWhiteSpace(selectedNote.Title)
+                    ? "Untitled Note"
+                    : selectedNote.Title)
+
+            </h1>
+
+            <!-- LAST EDITED -->
+            <p style="font-size: 13px;
+                      color: #64748b;
+                      margin-bottom: 20px;">
+
+                Last edited:
+                @selectedNote.LastEdited.ToString("MMMM dd, yyyy h:mm tt")
+
+            </p>
+
+            <div style="border-top: 2px solid #2563eb;
+                        margin-bottom: 25px;">
+            </div>
+
+            <!-- CORNELL NOTE TABLE -->
+            <table style="width: 100%;
+                          border-collapse: collapse;
+                          table-layout: fixed;
+                          font-size: 15px;">
+
+                <colgroup>
+                    <col style="width: 33%;" />
+                    <col style="width: 67%;" />
+                </colgroup>
+
+                <thead>
+                    <tr style="background: #eaf0f8;">
+
+                        <th style="border: 1px solid #64748b;
+                                   padding: 15px;
+                                   text-align: left;">
+
+                            Cues / Questions
+
+                        </th>
+
+                        <th style="border: 1px solid #64748b;
+                                   padding: 15px;
+                                   text-align: left;">
+
+                            Main Notes
+
+                        </th>
+
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    @foreach (var cue in selectedNote.Cues
+                        .OrderBy(c => c.CueSequence))
+                    {
+                        <tr @key="cue.Id">
+
+                            <!-- CUE COLUMN -->
+                            <td style="border: 1px solid #64748b;
+                                       background: #f8fafc;
+                                       padding: 15px;
+                                       vertical-align: top;
+                                       font-weight: bold;
+                                       white-space: pre-wrap;
+                                       overflow-wrap: anywhere;">@cue.Cue</td>
+
+                            <!-- MAIN NOTES COLUMN -->
+                            <td style="border: 1px solid #64748b;
+                                       padding: 15px;
+                                       vertical-align: top;
+                                       line-height: 1.8;
+                                       white-space: pre-wrap;
+                                       overflow-wrap: anywhere;">@cue.Content</td>
+
+                        </tr>
                     }
-        if (selectedNote.Cues.Count == 0)
-        {
-                  <button type="button"
-                        class="btn btn-success"
-                        @onclick="AddDetail">
-                    <i class="bi bi-plus-lg"></i>
-                </button>
-        }
-                    <label class="form-label">
-                        Summary
-                    </label>
 
-                    <textarea class="form-control mb-3"
-                              rows="3"
-                            @bind="selectedNote.Summary"
-                            @bind:event="oninput"
-                            @bind:after="OnNoteChanged"
-                            @onblur="SaveNoteAsync"></textarea>
+                    @if (selectedNote.Cues.Count == 0)
+                    {
+                        <tr>
 
-                <p class="text-muted">
-                    Last edited:
-                    @selectedNote.LastEdited.ToString("MMM dd, yyyy h:mm tt")
-                </p>
+                            <td style="border: 1px solid #64748b;
+                                       height: 180px;
+                                       background: #f8fafc;">
+                            </td>
 
-            }   
+                            <td style="border: 1px solid #64748b;
+                                       height: 180px;">
+                            </td>
+
+                        </tr>
+                    }
+
+                    <!-- FULL-WIDTH SUMMARY -->
+                    <tr>
+                        <td colspan="2"
+                            style="border: 1px solid #64748b;
+                                   background: #f1f5f9;
+                                   padding: 20px;">
+
+                            <div style="font-size: 18px;
+                                        font-weight: bold;
+                                        color: #172554;
+                                        margin-bottom: 10px;">
+
+                                Summary
+
+                            </div>
+
+                            <div style="min-height: 80px;
+                                        line-height: 1.8;
+                                        white-space: pre-wrap;
+                                        overflow-wrap: anywhere;">@selectedNote.Summary</div>
+
+                        </td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+            <!-- DOCUMENT FOOTER -->
+            <div style="border-top: 1px solid #e2e8f0;
+                        margin-top: 35px;
+                        padding-top: 15px;
+                        text-align: center;
+                        color: #64748b;
+                        font-size: 12px;">
+
+                Exported from BYUNotes
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code {
+
+}
 
 @code {
     [Parameter]
@@ -129,6 +499,7 @@
 
     [Parameter]
     public string? FocusField { get; set; }
+
     [Parameter]
     public EventCallback OnDelete { get; set; }
 
@@ -141,11 +512,15 @@
     {
         if (selectedNote is null)
             return;
+
         saveStatus = "Saving";
-        try{
+
+        try
+        {
             selectedNote.LastEdited = DateTime.Now;
 
             await NoteService.SaveNoteAsync(selectedNote);
+
             saveStatus = "Saved";
         }
         catch
@@ -153,38 +528,31 @@
             saveStatus = "Error";
             throw;
         }
-
     }
 
     private async Task AddDetail()
     {
         selectedNote.Cues.Add(new CornellNoteDetail
         {
-            CueSequence = selectedNote.Cues.Count + 1
+            CueSequence = selectedNote.Cues
+                .Select(c => c.CueSequence)
+                .DefaultIfEmpty(0)
+                .Max() + 1
         });
 
         await SaveNoteAsync();
     }
-
-    @* private async Task ExportNoteAsync(bool markdown)
-    {
-        await ExportNoteService.ExportNoteAsync(markdown, selectedNote);
-    } *@
 
     private void OnNoteChanged()
     {
         saveStatus = "Unsaved";
     }
 
-    //focus in the title after you create a note
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        //TODO Need to fix this from parent to child
         if (focusField == "Title")
         {
             focusField = null;
-            //I added selectText in wwwroot/js/notes.js
-            //this will select the field and let me edit the text directly
             await JS.InvokeVoidAsync("selectText", titleInput);
         }
         else if (focusField == "Content")
@@ -197,7 +565,7 @@
     private async Task RemoveDetail(CornellNoteDetail cue)
     {
         selectedNote.Cues.Remove(cue);
+
         await SaveNoteAsync();
     }
 }
-
