@@ -58,15 +58,18 @@
 
             <hr />
 
-            <label class="form-label">
-                Note Type
-            </label>
+            
+                <label class="form-label">
+                    Note Type
+                </label>
 
-            <select class="form-select mb-2"
-                    @bind="newNoteType">
-                <option value="Text">Text Note</option>
-                <option value="Cornell">Cornell Notes</option>
-            </select>
+                <select class="form-select mb-2"
+                        @bind="newNoteType">
+                    <option value="Text">Text Note</option>
+                    <option value="Cornell">Cornell Notes</option>
+                    <option value="Outline">Outline Notes</option>
+                </select>
+
 
             <button type="button"
                     class="btn btn-success"
@@ -80,16 +83,25 @@
         <div class="card p-3 h-100">
             @if (selectedNote is not null)
             {
-                if (selectedNote is CornellNote cornellNote)
-                {
-                    <CornellNoteComponent SelectedNote="cornellNote"
-                    OnDelete="DeleteNoteAsync"></CornellNoteComponent>
-                }
-                else if (selectedNote is TextNote textNote)
-                {
-                    <TextNoteComponent SelectedNote="textNote"
-                    OnDelete="DeleteNoteAsync"></TextNoteComponent>
-                }
+                
+            if (selectedNote is CornellNote cornellNote)
+            {
+                <CornellNoteComponent SelectedNote="cornellNote"
+                                    OnDelete="DeleteNoteAsync" />
+            }
+            else if (selectedNote is TextNote textNote)
+            {
+                <TextNoteComponent SelectedNote="textNote"
+                                OnDelete="DeleteNoteAsync" />
+            }
+            else if (selectedNote is OutlineNote outlineNote)
+            {
+                <OutlineNoteComponent
+                    @key="outlineNote.Id"
+                    SelectedNote="outlineNote"
+                    OnDelete="DeleteNoteAsync" />
+            }
+
                  <!-- EXPORT BUTTONS -->
                 <div class="d-flex gap-2 mb-3">
                     <button type="button"
@@ -119,7 +131,7 @@
 
 
 @code {
-    private string? focusField;
+
     private List<Note> notes = new();
 
     private Note? selectedNote;
@@ -147,35 +159,28 @@
     private void SelectNote(Note note)
     {
         selectedNote = note;
-        focusField = "Content";
+        
     }
 
-    private async Task CreateNoteAsync()
-    {
-        if (newNoteType == "Cornell")
+    
+        private async Task CreateNoteAsync()
         {
-            var note = new CornellNote
+            Note note = newNoteType switch
             {
-                Title = "Untitled Note",
+                "Cornell" => new CornellNote(),
+                "Outline" => new OutlineNote(),
+                _ => new TextNote()
             };
+
+            note.Title = "Untitled Note";
+
             await NoteService.CreateNoteAsync(note);
+
             notes.Insert(0, note);
             selectedNote = note;
-        }
-        else
-        {
-            var note = new TextNote
-            {
-                Title = "Untitled Note",
-            };
-            await NoteService.CreateNoteAsync(note);
-            notes.Insert(0, note);
-            selectedNote = note;
-        }
 
-        focusField = "Title";
-    }
-
+            
+        }
 
     private async Task DeleteNoteAsync()
     {
@@ -183,10 +188,12 @@
             return;
 
         await NoteService.DeleteNoteAsync(selectedNote);
+
         notes.Remove(selectedNote);
-        if (notes.Count > 0)
-            selectedNote = notes[0];
+
+        selectedNote = notes.FirstOrDefault();
     }
+
 
     private async Task ExportNoteAsync(bool markdown)
     {

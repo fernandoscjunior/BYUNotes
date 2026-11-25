@@ -13,11 +13,22 @@ public class NotesDbContext : DbContext
 
     public DbSet<Note> Notes { get; set; } = null!;
 
+    
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+       
         modelBuilder.Entity<CornellNote>();
-        modelBuilder.Entity<TextNote>();
+
+        modelBuilder.Entity<TextNote>()
+            .Property(n => n.Content)
+            .HasColumnName("Content");
+
+        modelBuilder.Entity<OutlineNote>()
+            .Property(n => n.Content)
+            .HasColumnName("Content");
 
     }
+
 }
