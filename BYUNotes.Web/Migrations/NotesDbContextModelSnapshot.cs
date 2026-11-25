@@ -82,6 +82,21 @@ namespace BYUNotes.Web.Migrations
                     b.HasDiscriminator().HasValue("CornellNote");
                 });
 
+            modelBuilder.Entity("BYUNotes.Web.Models.MappingNote", b =>
+                {
+                    b.HasBaseType("BYUNotes.Web.Models.Note");
+
+                    b.Property<string>("BranchesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CentralTopic")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasDiscriminator().HasValue("MappingNote");
+                });
+
             modelBuilder.Entity("BYUNotes.Web.Models.OutlineNote", b =>
                 {
                     b.HasBaseType("BYUNotes.Web.Models.Note");

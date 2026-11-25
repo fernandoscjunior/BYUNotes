@@ -1,0 +1,1001 @@
+
+@using System.Text.Json
+@using Microsoft.JSInterop
+@using BYUNotes.Web.Models
+@using BYUNotes.Web.Services
+
+@implements IAsyncDisposable
+
+@inject NoteService NoteService
+@inject IJSRuntime JS
+
+<div class="d-flex justify-content-between align-items-center">
+    <h3 class="mb-0">Mapping Note Editor</h3>
+
+    <div class="d-flex align-items-center gap-3">
+        <span class="text-muted">@saveStatus</span>
+
+        <button type="button"
+                class="btn btn-outline-danger btn-sm"
+                @onclick="() => OnDelete.InvokeAsync()">
+            <i class="bi bi-trash"></i> Delete
+        </button>
+    </div>
+</div>
+
+<hr />
+
+<label class="form-label">Title</label>
+
+<input class="form-control mb-3"
+       @bind="SelectedNote.Title"
+       @bind:event="oninput"
+       @bind:after="OnNoteChanged"
+       @onblur="SaveNoteAsync" />
+
+<div class="row g-3 mb-3">
+
+    <!-- LEFT: EDITOR -->
+
+    <div class="col-lg-5">
+        <div class="card h-100">
+
+            <div class="card-header">
+                <strong>Edit Mind Map</strong>
+            </div>
+
+            <div class="card-body"
+                 style="max-height: 850px; overflow-y: auto;">
+
+                <label class="form-label">
+                    <strong>Central Topic</strong>
+                </label>
+
+                <input class="form-control mb-3"
+                       placeholder="Enter your main topic..."
+                       @bind="SelectedNote.CentralTopic"
+                       @bind:event="oninput"
+                       @bind:after="OnNoteChanged"
+                       @onblur="SaveNoteAsync" />
+
+                <label class="form-label">
+                    Central Topic Color
+                </label>
+
+                <input type="color"
+                       class="form-control form-control-color mb-3"
+                       @bind="rootColor"
+                       @bind:after="SaveNoteAsync" />
+
+                <button type="button"
+                        class="btn btn-outline-primary w-100 mb-3"
+                        @onclick="AddRootBranch">
+                    + Add Branch to Central Topic
+                </button>
+
+                <div class="border rounded p-3 mb-3">
+
+                    <label class="form-label">
+                        <strong>Connect New Branch To</strong>
+                    </label>
+
+                    <select class="form-select mb-2"
+                            @bind="selectedParentId">
+
+                        <option value="">Central Topic</option>
+
+                        @foreach (var branch in branches)
+                        {
+                            <option value="@branch.Id.ToString()">
+                                @GetBranchTitle(branch)
+                            </option>
+                        }
+
+                    </select>
+
+                    <button type="button"
+                            class="btn btn-success w-100"
+                            @onclick="AddBranch">
+                        + Add Branch
+                    </button>
+
+                </div>
+
+                @foreach (var branch in branches)
+                {
+                    <div class="border rounded p-3 mb-3"
+                         @key="@($"node-{branch.Id}")"
+                         style="border-left: 5px solid @branch.Color !important;">
+
+                        <small class="text-muted">
+                            Connected to: @GetParentTitle(branch)
+                        </small>
+
+                        <label class="form-label d-block mt-2">
+                            <strong>Branch Title</strong>
+                        </label>
+
+                        <input class="form-control mb-2"
+                               placeholder="Enter a related idea..."
+                               @bind="branch.Title"
+                               @bind:event="oninput"
+                               @bind:after="OnNoteChanged"
+                               @onblur="SaveNoteAsync" />
+
+                        <label class="form-label">
+                            Description
+                        </label>
+
+                        <textarea class="form-control mb-2"
+                                  rows="3"
+                                  placeholder="Add supporting information..."
+                                  @bind="branch.Content"
+                                  @bind:event="oninput"
+                                  @bind:after="OnNoteChanged"
+                                  @onblur="SaveNoteAsync"></textarea>
+
+                        <div class="d-flex align-items-center
+                                    justify-content-between flex-wrap gap-2">
+
+                            <input type="color"
+                                   class="form-control form-control-color"
+                                   title="Branch color"
+                                   @bind="branch.Color"
+                                   @bind:after="SaveNoteAsync" />
+
+                            <button type="button"
+                                    class="btn btn-outline-success btn-sm"
+                                    @onclick="() => AddChildBranch(branch)">
+                                + Sub-branch
+                            </button>
+
+                            <button type="button"
+                                    class="btn btn-outline-danger btn-sm"
+                                    @onclick="() => RemoveBranch(branch)">
+                                Remove
+                            </button>
+
+                        </div>
+
+                        <!-- POSITION CONTROLS -->
+
+                        <div class="mt-3">
+
+                            <small class="text-muted">
+                                Branch Position
+                            </small>
+
+                            <div class="d-flex gap-2 mt-1">
+
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        @onclick="() => MoveBranch(branch, -40, 0)">
+                                    ←
+                                </button>
+
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        @onclick="() => MoveBranch(branch, 0, -40)">
+                                    ↑
+                                </button>
+
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        @onclick="() => MoveBranch(branch, 0, 40)">
+                                    ↓
+                                </button>
+
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        @onclick="() => MoveBranch(branch, 40, 0)">
+                                    →
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+                }
+
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: MIND MAP -->
+
+    <div class="col-lg-7" style="min-width: 0;">
+
+        <div class="card h-100">
+
+            <div class="card-header">
+
+                <div class="d-flex justify-content-between
+                            align-items-center flex-wrap gap-2">
+
+                    <strong>Live Mind Map</strong>
+
+                    <div class="d-flex align-items-center gap-2">
+
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                @onclick="ZoomOut">
+                            −
+                        </button>
+
+                        <small>@($"{zoom * 100:0}%")</small>
+
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                @onclick="ZoomIn">
+                            +
+                        </button>
+
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                @onclick="ResetZoom">
+                            Reset
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="border rounded p-2 mb-3">
+
+                    <small class="text-muted">
+                        Selected bubble:
+                    </small>
+
+                    <strong>@SelectedParentTitle</strong>
+
+                    <button type="button"
+                            class="btn btn-success btn-sm w-100 mt-2"
+                            @onclick="AddBranch">
+                        + Add Branch to Selected Bubble
+                    </button>
+
+                </div>
+
+                <p class="text-muted small">
+                    Click a bubble to select it.
+                    Click and drag to move it anywhere on the canvas.
+                    Positions are saved automatically.
+                </p>
+
+                <div style="overflow: auto;
+                            max-height: 750px;
+                            background: #f8fafc;
+                            border-radius: 8px;">
+
+                    <svg id="mapping-preview"
+                         viewBox="@($"0 0 {CanvasWidth} {CanvasHeight}")"
+                         width="@(CanvasWidth * zoom)"
+                         height="@(CanvasHeight * zoom)"
+                         style="touch-action: none;
+                                user-select: none;
+                                display: block;">
+
+                        <!-- CONNECTING LINES -->
+
+                        @foreach (var branch in branches)
+                        {
+                            var parent = branches.FirstOrDefault(
+                                b => b.Id == branch.ParentId);
+
+                            double startX = parent?.X ?? rootX;
+                            double startY = parent?.Y ?? rootY;
+
+                            double endX = branch.X ?? 500;
+                            double endY = branch.Y ?? 250;
+
+                            <line @key="@($"line-{branch.Id}")"
+                                  data-child-id="@branch.Id.ToString()"
+                                  data-parent-id="@(parent?.Id.ToString() ?? "root")"
+                                  x1="@startX"
+                                  y1="@startY"
+                                  x2="@endX"
+                                  y2="@endY"
+                                  stroke="@branch.Color"
+                                  stroke-width="3"
+                                  pointer-events="none" />
+                        }
+
+                        <!-- CENTRAL TOPIC -->
+
+                        <foreignObject data-node-id="root"
+                                       x="@(rootX - 110)"
+                                       y="@(rootY - 40)"
+                                       width="220"
+                                       height="80">
+
+                            <div @onclick="SelectRoot"
+                                 style="background: @rootColor;
+                                        color: white;
+                                        border: @(selectedParentId == ""
+                                            ? "4px solid #f59e0b"
+                                            : "4px solid transparent");
+                                        border-radius: 15px;
+                                        padding: 10px;
+                                        box-sizing: border-box;
+                                        height: 100%;
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                        text-align: center;
+                                        font-weight: bold;
+                                        overflow-wrap: anywhere;
+                                        overflow: hidden;
+                                        cursor: grab;
+                                        user-select: none;">
+
+                                @RootTitle
+
+                            </div>
+
+                        </foreignObject>
+
+                        <!-- BRANCH BUBBLES -->
+
+                        @foreach (var branch in branches)
+                        {
+                            <foreignObject
+                                @key="branch.Id"
+                                data-node-id="@branch.Id.ToString()"
+                                x="@((branch.X ?? 500) - 110)"
+                                y="@((branch.Y ?? 250) - 65)"
+                                width="220"
+                                height="130">
+
+                                <div @onclick="() => SelectBranch(branch)"
+                                     style="border: 3px solid @branch.Color;
+                                            background: white;
+                                            color: #212529;
+                                            border-radius: 12px;
+                                            height: 100%;
+                                            box-sizing: border-box;
+                                            padding: 10px;
+                                            text-align: center;
+                                            overflow: auto;
+                                            overflow-wrap: anywhere;
+                                            cursor: grab;
+                                            user-select: none;
+                                            box-shadow: @(selectedParentId == branch.Id.ToString()
+                                                ? "inset 0 0 0 3px #f59e0b"
+                                                : "none");">
+
+                                    <strong style="color: @branch.Color;">
+                                        @GetBranchTitle(branch)
+                                    </strong>
+
+                                    <hr style="margin: 8px 0;" />
+
+                                    <div style="white-space: pre-wrap;">
+                                        @branch.Content
+                                    </div>
+
+                                </div>
+
+                            </foreignObject>
+                        }
+
+                    </svg>
+
+                </div>
+
+                @if (branches.Count == 0)
+                {
+                    <p class="text-muted text-center mt-3">
+                        Add branches to start building your mind map.
+                    </p>
+                }
+
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<p class="text-muted small">
+    Last edited:
+    @SelectedNote.LastEdited.ToString("MMM dd, yyyy h:mm tt")
+</p>
+
+<!-- MAPPING NOTE EXPORT PREVIEW -->
+<div aria-hidden="true"
+     style="position: fixed;
+            left: -10000px;
+            top: 0;
+            pointer-events: none;">
+
+    <div id="note-export-preview"
+         style="width: @(CanvasWidth + 80)px;
+                padding: 40px;
+                box-sizing: border-box;
+                background: #ffffff;
+                color: #212529;
+                font-family: Arial, sans-serif;">
+
+        <!-- DOCUMENT HEADER -->
+        <div style="color: #64748b;
+                    font-size: 13px;
+                    font-weight: bold;
+                    letter-spacing: 1px;
+                    margin-bottom: 15px;">
+
+            BYUNOTES | MAPPING NOTES
+
+        </div>
+
+        <!-- NOTE TITLE -->
+        <h1 style="font-size: 32px;
+                   font-weight: bold;
+                   color: #172554;
+                   overflow-wrap: anywhere;
+                   margin-bottom: 10px;">
+
+            @(string.IsNullOrWhiteSpace(SelectedNote.Title)
+                ? "Untitled Note"
+                : SelectedNote.Title)
+
+        </h1>
+
+        <!-- LAST EDITED -->
+        <p style="font-size: 13px;
+                  color: #64748b;
+                  margin-bottom: 20px;">
+
+            Last edited:
+            @SelectedNote.LastEdited.ToString("MMMM dd, yyyy h:mm tt")
+
+        </p>
+
+        <div style="border-top: 2px solid #2563eb;
+                    margin-bottom: 25px;">
+        </div>
+
+        <!-- COMPLETE MIND MAP -->
+        <div style="position: relative;
+                    width: @(CanvasWidth)px;
+                    height: @(CanvasHeight)px;
+                    background: #f8fafc;
+                    border-radius: 8px;">
+
+            <!-- CONNECTING LINES -->
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 width="@CanvasWidth"
+                 height="@CanvasHeight"
+                 viewBox="@($"0 0 {CanvasWidth} {CanvasHeight}")"
+                 style="position: absolute;
+                        top: 0;
+                        left: 0;
+                        display: block;">
+
+                @foreach (var branch in branches)
+                {
+                    var parent = branches.FirstOrDefault(
+                        b => b.Id == branch.ParentId);
+
+                    double startX = parent?.X ?? rootX;
+                    double startY = parent?.Y ?? rootY;
+
+                    double endX = branch.X ?? 500;
+                    double endY = branch.Y ?? 250;
+
+                    <line @key="@($"export-line-{branch.Id}")"
+                          x1="@startX"
+                          y1="@startY"
+                          x2="@endX"
+                          y2="@endY"
+                          stroke="@branch.Color"
+                          stroke-width="3" />
+                }
+
+            </svg>
+
+            <!-- CENTRAL TOPIC -->
+            <div style="position: absolute;
+                        left: @(rootX - 110)px;
+                        top: @(rootY - 40)px;
+                        width: 220px;
+                        height: 80px;
+                        background: @rootColor;
+                        color: #ffffff;
+                        border-radius: 15px;
+                        padding: 10px;
+                        box-sizing: border-box;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        text-align: center;
+                        font-weight: bold;
+                        overflow-wrap: anywhere;
+                        overflow: hidden;">
+
+                @RootTitle
+
+            </div>
+
+            <!-- BRANCH BUBBLES -->
+            @foreach (var branch in branches)
+            {
+                <div @key="@($"export-node-{branch.Id}")"
+                     style="position: absolute;
+                            left: @((branch.X ?? 500) - 110)px;
+                            top: @((branch.Y ?? 250) - 65)px;
+                            width: 220px;
+                            height: 130px;
+                            border: 3px solid @branch.Color;
+                            background: #ffffff;
+                            color: #212529;
+                            border-radius: 12px;
+                            box-sizing: border-box;
+                            padding: 10px;
+                            text-align: center;
+                            overflow: hidden;
+                            overflow-wrap: anywhere;">
+
+                    <strong style="color: @branch.Color;">
+
+                        @GetBranchTitle(branch)
+
+                    </strong>
+
+                    <hr style="margin: 8px 0;
+                               border: 0;
+                               border-top: 1px solid #cbd5e1;" />
+
+                    <div style="white-space: pre-wrap;
+                                font-size: 14px;
+                                line-height: 1.4;">@branch.Content</div>
+
+                </div>
+            }
+
+        </div>
+
+        <!-- COMPLETE BRANCH DESCRIPTIONS -->
+        @if (branches.Count > 0)
+        {
+            <h2 style="font-size: 22px;
+                       color: #172554;
+                       margin-top: 35px;
+                       margin-bottom: 20px;">
+
+                Branch Details
+
+            </h2>
+
+            @foreach (var branch in branches)
+            {
+                <div @key="@($"export-detail-{branch.Id}")"
+                     style="border: 1px solid #e2e8f0;
+                            border-left: 5px solid @branch.Color;
+                            border-radius: 6px;
+                            padding: 15px;
+                            margin-bottom: 15px;">
+
+                    <h3 style="font-size: 18px;
+                               color: @branch.Color;
+                               margin-bottom: 8px;">
+
+                        @GetBranchTitle(branch)
+
+                    </h3>
+
+                    <div style="font-size: 13px;
+                                color: #64748b;
+                                margin-bottom: 10px;">
+
+                        Connected to: @GetParentTitle(branch)
+
+                    </div>
+
+                    <div style="white-space: pre-wrap;
+                                overflow-wrap: anywhere;
+                                line-height: 1.7;">@branch.Content</div>
+
+                </div>
+            }
+        }
+
+        <!-- DOCUMENT FOOTER -->
+        <div style="border-top: 1px solid #e2e8f0;
+                    margin-top: 35px;
+                    padding-top: 15px;
+                    text-align: center;
+                    color: #64748b;
+                    font-size: 12px;">
+
+            Exported from BYUNotes
+
+        </div>
+
+    </div>
+
+</div>
+
+@code {
+
+    [Parameter, EditorRequired]
+    public MappingNote SelectedNote { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    private List<MappingBranch> branches = new();
+
+    private Guid? loadedNoteId;
+
+    private string saveStatus = "Saved";
+
+    private string selectedParentId = "";
+
+    private double zoom = 0.8;
+
+    private double rootX = 500;
+    private double rootY = 80;
+
+    private string rootColor = "#2563eb";
+
+    private DotNetObjectReference<MappingNoteComponent>? dotNetRef;
+
+    private bool jsInitialized;
+
+    private readonly string[] colors =
+    {
+        "#2563eb",
+        "#16a34a",
+        "#9333ea",
+        "#d97706",
+        "#dc2626",
+        "#0891b2",
+        "#db2777",
+        "#475569"
+    };
+
+    private double CanvasWidth =>
+        Math.Max(
+            Math.Max(1000, rootX + 200),
+            branches.Select(b => (b.X ?? 500) + 200)
+                    .DefaultIfEmpty(1000).Max());
+
+    private double CanvasHeight =>
+        Math.Max(
+            Math.Max(800, rootY + 150),
+            branches.Select(b => (b.Y ?? 250) + 150)
+                    .DefaultIfEmpty(800).Max());
+
+    private string RootTitle =>
+        string.IsNullOrWhiteSpace(SelectedNote.CentralTopic)
+            ? "Central Topic"
+            : SelectedNote.CentralTopic;
+
+    private string SelectedParentTitle
+    {
+        get
+        {
+            var parent = branches.FirstOrDefault(
+                b => b.Id.ToString() == selectedParentId);
+
+            return parent is null
+                ? RootTitle
+                : GetBranchTitle(parent);
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (loadedNoteId == SelectedNote.Id)
+            return;
+
+        loadedNoteId = SelectedNote.Id;
+
+        selectedParentId = "";
+        zoom = 0.8;
+
+        var savedBranches =
+            JsonSerializer.Deserialize<List<MappingBranch>>(
+                string.IsNullOrWhiteSpace(SelectedNote.BranchesJson)
+                    ? "[]"
+                    : SelectedNote.BranchesJson
+            ) ?? new List<MappingBranch>();
+
+        // Load central topic settings.
+
+        var rootSettings = savedBranches.FirstOrDefault(
+            b => b.Id == Guid.Empty);
+
+        rootX = rootSettings?.X ?? 500;
+        rootY = rootSettings?.Y ?? 80;
+        rootColor = rootSettings?.Color ?? "#2563eb";
+
+        // Exclude central topic settings from actual branches.
+
+        branches = savedBranches
+            .Where(b => b.Id != Guid.Empty)
+            .ToList();
+
+        // Default positions for older notes.
+
+        for (int i = 0; i < branches.Count; i++)
+        {
+            branches[i].X ??= i % 2 == 0 ? 250 : 750;
+            branches[i].Y ??= 250 + (i / 2) * 180;
+        }
+
+        saveStatus = "Saved";
+    }
+
+    // CONNECT JAVASCRIPT TO BLAZOR
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!jsInitialized)
+        {
+            dotNetRef ??= DotNetObjectReference.Create(this);
+
+            await JS.InvokeVoidAsync(
+                "mindMap.initialize",
+                "mapping-preview",
+                dotNetRef);
+
+            jsInitialized = true;
+        }
+    }
+
+    // RECEIVE DRAGGED POSITIONS FROM JAVASCRIPT
+
+    [JSInvokable]
+public async Task SaveNodePosition(
+    string nodeId, double x, double y)
+{
+    await InvokeAsync(async () =>
+    {
+        Console.WriteLine(
+            $"Received position: {nodeId}, X={x}, Y={y}");
+
+        if (!double.IsFinite(x) || !double.IsFinite(y))
+            return;
+
+        if (nodeId == "root")
+        {
+            rootX = Math.Max(110, x);
+            rootY = Math.Max(40, y);
+
+            selectedParentId = "";
+        }
+        else if (Guid.TryParse(nodeId, out var id))
+        {
+            var branch = branches.FirstOrDefault(
+                b => b.Id == id);
+
+            if (branch is null)
+                return;
+
+            branch.X = Math.Max(110, x);
+            branch.Y = Math.Max(65, y);
+
+            selectedParentId = branch.Id.ToString();
+        }
+        else
+        {
+            return;
+        }
+
+        await SaveNoteAsync();
+
+        StateHasChanged();
+
+        if (saveStatus != "Saved")
+        {
+            throw new InvalidOperationException(saveStatus);
+        }
+    });
+}
+
+    private string GetBranchTitle(MappingBranch branch)
+    {
+        return string.IsNullOrWhiteSpace(branch.Title)
+            ? "Untitled Branch"
+            : branch.Title;
+    }
+
+    private string GetParentTitle(MappingBranch branch)
+    {
+        var parent = branches.FirstOrDefault(
+            b => b.Id == branch.ParentId);
+
+        return parent is null
+            ? RootTitle
+            : GetBranchTitle(parent);
+    }
+
+    private void SelectRoot()
+    {
+        selectedParentId = "";
+    }
+
+    private void SelectBranch(MappingBranch branch)
+    {
+        selectedParentId = branch.Id.ToString();
+    }
+
+    private async Task AddRootBranch()
+    {
+        selectedParentId = "";
+
+        await AddBranch();
+    }
+
+    private async Task AddBranch()
+    {
+        Guid? parentId = Guid.TryParse(
+            selectedParentId, out var parsedId)
+            ? parsedId
+            : null;
+
+        var parent = branches.FirstOrDefault(
+            b => b.Id == parentId);
+
+        double parentX = parent?.X ?? rootX;
+        double parentY = parent?.Y ?? rootY;
+
+        // Distribute new branches around their parent.
+
+        int siblingCount = branches.Count(
+            b => b.ParentId == parent?.Id);
+
+        double angle =
+            Math.PI / 2 + siblingCount * Math.PI / 4;
+
+        double x = Math.Max(
+            120, parentX + Math.Cos(angle) * 300);
+
+        double y = Math.Max(
+            70, parentY + Math.Sin(angle) * 200);
+
+        // Avoid overlapping the central topic or other branches.
+
+        while (
+            (Math.Abs(rootX - x) < 230 &&
+             Math.Abs(rootY - y) < 120)
+            ||
+            branches.Any(b =>
+                Math.Abs((b.X ?? 0) - x) < 230 &&
+                Math.Abs((b.Y ?? 0) - y) < 150))
+        {
+            y += 180;
+        }
+
+        branches.Add(new MappingBranch
+        {
+            Title = "",
+            Content = "",
+            ParentId = parent?.Id,
+            X = x,
+            Y = y,
+            Color = parent?.Color
+                ?? colors[branches.Count % colors.Length]
+        });
+
+        await SaveNoteAsync();
+    }
+
+    private async Task AddChildBranch(MappingBranch parent)
+    {
+        selectedParentId = parent.Id.ToString();
+
+        await AddBranch();
+    }
+
+    private async Task RemoveBranch(MappingBranch branch)
+    {
+        foreach (var child in branches.Where(
+            b => b.ParentId == branch.Id))
+        {
+            child.ParentId = branch.ParentId;
+        }
+
+        if (selectedParentId == branch.Id.ToString())
+        {
+            selectedParentId =
+                branch.ParentId?.ToString() ?? "";
+        }
+
+        branches.Remove(branch);
+
+        await SaveNoteAsync();
+    }
+
+    private async Task MoveBranch(
+        MappingBranch branch, double dx, double dy)
+    {
+        branch.X = Math.Max(
+            120, (branch.X ?? 500) + dx);
+
+        branch.Y = Math.Max(
+            70, (branch.Y ?? 250) + dy);
+
+        await SaveNoteAsync();
+    }
+
+    private void ZoomIn()
+    {
+        zoom = Math.Min(2.0, zoom + 0.1);
+    }
+
+    private void ZoomOut()
+    {
+        zoom = Math.Max(0.2, zoom - 0.1);
+    }
+
+    private void ResetZoom()
+    {
+        zoom = 0.8;
+    }
+
+    private void OnNoteChanged()
+    {
+        saveStatus = "Unsaved changes";
+    }
+
+    private async Task SaveNoteAsync()
+    {
+        saveStatus = "Saving...";
+
+        try
+        {
+            var savedBranches =
+                new List<MappingBranch>(branches);
+
+            // Store central topic settings in the existing JSON.
+
+            savedBranches.Add(new MappingBranch
+            {
+                Id = Guid.Empty,
+                X = rootX,
+                Y = rootY,
+                Color = rootColor
+            });
+
+            SelectedNote.BranchesJson =
+                JsonSerializer.Serialize(savedBranches);
+
+            SelectedNote.LastEdited = DateTime.Now;
+
+            await NoteService.SaveNoteAsync(SelectedNote);
+
+            saveStatus = "Saved";
+        }
+        catch
+        {
+            saveStatus = "Save failed";
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (jsInitialized)
+            {
+                await JS.InvokeVoidAsync(
+                    "mindMap.dispose",
+                    "mapping-preview");
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // Browser connection has already closed.
+        }
+        finally
+        {
+            dotNetRef?.Dispose();
+        }
+    }
+}

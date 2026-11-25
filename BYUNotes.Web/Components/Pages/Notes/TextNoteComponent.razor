@@ -1,3 +1,4 @@
+
 @using System.Linq
 @using BYUNotes.Web.Models
 @using BYUNotes.Web.Services
@@ -6,161 +7,220 @@
 @inject ExportNoteService ExportNoteService
 @inject IJSRuntime JS
 
+<div class="d-flex justify-content-between align-items-center">
 
-            <div class="d-flex justify-content-between align-items-center"> 
-                <h3 class="mb-0">Note Editor</h3>
-                <div class="d-flex align-items-center gap-3">
-                    @if (saveStatus == "Saved")
-                    {
-                        <span class="text-success">
-                            <i class="bi bi-check-circle"></i> Saved
-                        </span>
-                    }
-                    else if (saveStatus == "Saving")
-                    {
-                        <span class="text-muted">
-                            <span class="spinner-border spinner-border-sm"></span>
-                            Saving...
-                        </span>
-                    }
-                    else if (saveStatus == "Error")
-                    {
-                        <span class="text-danger">
-                            <i class="bi bi-exclamation-circle"></i> Save failed
-                        </span>
-                    }
-                    else {
-                        <span class="text-muted">
-                            <i class="bi bi-pencil"></i> Unsaved changes
-                        </span>
-                    }
-                    <button type="button"
-                            class="border-0 bg-transparent text-danger"
-                            @onclick="() => OnDelete.InvokeAsync()">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </div>
+    <h3 class="mb-0">Note Editor</h3>
+
+    <div class="d-flex align-items-center gap-3">
+
+        @if (saveStatus == "Saved")
+        {
+            <span class="text-success">
+                <i class="bi bi-check-circle"></i> Saved
+            </span>
+        }
+        else if (saveStatus == "Saving")
+        {
+            <span class="text-muted">
+                <span class="spinner-border spinner-border-sm"></span>
+                Saving...
+            </span>
+        }
+        else if (saveStatus == "Error")
+        {
+            <span class="text-danger">
+                <i class="bi bi-exclamation-circle"></i> Save failed
+            </span>
+        }
+        else
+        {
+            <span class="text-muted">
+                <i class="bi bi-pencil"></i> Unsaved changes
+            </span>
+        }
+
+        <button type="button"
+                class="border-0 bg-transparent text-danger"
+                @onclick="() => OnDelete.InvokeAsync()">
+
+            <i class="bi bi-trash"></i>
+
+        </button>
+
+    </div>
+
+</div>
+
+<hr />
+
+@if (selectedNote is not null)
+{
+    <label class="form-label">Title</label>
+
+    <input class="form-control mb-3"
+           @ref="titleInput"
+           @bind="selectedNote.Title"
+           @bind:event="oninput"
+           @bind:after="OnNoteChanged"
+           @onblur="SaveNoteAsync" />
+
+    <h5>Notes</h5>
+
+    <label class="form-label">
+        Main Notes
+    </label>
+
+    <textarea class="form-control mb-3"
+              rows="6"
+              @ref="contentInput"
+              @bind="selectedNote.Content"
+              @bind:event="oninput"
+              @bind:after="OnNoteChanged"
+              @onblur="SaveNoteAsync"></textarea>
+
+    <p class="text-muted">
+        Last edited:
+        @selectedNote.LastEdited.ToString("MMM dd, yyyy h:mm tt")
+    </p>
+
+    <!-- EXPORT PREVIEW -->
+    <div aria-hidden="true"
+         style="position: fixed;
+                left: -10000px;
+                top: 0;
+                pointer-events: none;">
+
+        <div id="note-export-preview"
+             style="width: 800px;
+                    min-height: 400px;
+                    padding: 40px;
+                    box-sizing: border-box;
+                    background: #ffffff;
+                    color: #212529;
+                    font-family: Arial, sans-serif;">
+
+            <!-- DOCUMENT HEADER -->
+            <div style="color: #64748b;
+                        font-size: 13px;
+                        font-weight: bold;
+                        letter-spacing: 1px;
+                        margin-bottom: 15px;">
+
+                BYUNOTES | TEXT NOTE
+
             </div>
-            <hr />
-    @if (selectedNote is not null)
-            {
-                <label class="form-label">Title</label>
 
-                <input class="form-control mb-3"
-                        @ref="titleInput"
-                       @bind="selectedNote.Title"
-                            @bind:event="oninput"
-                            @bind:after="OnNoteChanged"
-                            @onblur="SaveNoteAsync" />
+            <!-- NOTE TITLE -->
+            <h1 style="font-size: 32px;
+                       font-weight: bold;
+                       color: #172554;
+                       overflow-wrap: anywhere;
+                       margin-bottom: 10px;">
 
-                @* <p class="text-muted">
-                    Type: @selectedNote.Type
-                </p> *@
+                @(string.IsNullOrWhiteSpace(selectedNote.Title)
+                    ? "Untitled Note"
+                    : selectedNote.Title)
 
-                    <h5>Notes</h5>
-                
-                    <label class="form-label">
-                        Main Notes
-                    </label>
+            </h1>
 
-                    <textarea class="form-control mb-3"
-                              rows="6"
-                            @ref="contentInput"
-                            @bind="selectedNote.Content"
-                            @bind:event="oninput"
-                            @bind:after="OnNoteChanged"
-                            @onblur="SaveNoteAsync"></textarea>
+            <!-- LAST EDITED -->
+            <p style="font-size: 13px;
+                      color: #64748b;
+                      margin-bottom: 20px;">
 
-                
+                Last edited:
+                @selectedNote.LastEdited.ToString("MMMM dd, yyyy h:mm tt")
 
-                <p class="text-muted">
-                    Last edited:
-                    @selectedNote.LastEdited.ToString("MMM dd, yyyy h:mm tt")
-                </p>
-                
-            }   
+            </p>
+
+            <div style="border-top: 2px solid #2563eb;
+                        margin-bottom: 25px;">
+            </div>
+
+            <!-- NOTE CONTENT -->
+            <div style="font-size: 16px;
+                        line-height: 1.8;
+                        white-space: pre-wrap;
+                        overflow-wrap: anywhere;
+                        min-height: 200px;">@selectedNote.Content</div>
+
+            <!-- DOCUMENT FOOTER -->
+            <div style="border-top: 1px solid #e2e8f0;
+                        margin-top: 35px;
+                        padding-top: 15px;
+                        text-align: center;
+                        color: #64748b;
+                        font-size: 12px;">
+
+                Exported from BYUNotes
+
+            </div>
+
+        </div>
+
+    </div>
+}
 
 @code {
+
     [Parameter]
     public TextNote selectedNote { get; set; } = null!;
 
     [Parameter]
     public string? FocusField { get; set; }
+
     [Parameter]
     public EventCallback OnDelete { get; set; }
 
     private ElementReference titleInput;
     private ElementReference contentInput;
+
     private string? focusField;
     private string saveStatus = "Saved";
-
-    @* protected override async Task OnInitializedAsync()
-    {
-        await LoadNotesAsync();
-    }
-
-    private async Task LoadNotesAsync()
-    {
-        notes= await NoteService.LoadNotesAsync();
-    } *@
 
     private async Task SaveNoteAsync()
     {
         if (selectedNote is null)
             return;
+
         saveStatus = "Saving";
-        try{
+
+        try
+        {
             selectedNote.LastEdited = DateTime.Now;
 
             await NoteService.SaveNoteAsync(selectedNote);
+
             saveStatus = "Saved";
         }
-        catch
+        catch (Exception ex)
         {
             saveStatus = "Error";
-            throw;
+
+            Console.WriteLine($"TEXT NOTE SAVE ERROR: {ex}");
         }
-
     }
-
-    @* private async Task DeleteNoteAsync()
-    {
-        if (selectedNote is null)
-            return;
-
-        await NoteService.DeleteNoteAsync(selectedNote);
-        notes.Remove(selectedNote);
-
-        //TODO handle null
-        selectedNote = null;
-    } *@
-
-    @* private async Task ExportNoteAsync(bool markdown)
-    {
-        await ExportNoteService.ExportNoteAsync(markdown, selectedNote);
-    } *@
 
     private void OnNoteChanged()
     {
         saveStatus = "Unsaved";
     }
 
-    //focus in the title after you create a note
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        //TODO Need to fix this from parent to child
         if (focusField == "Title")
         {
             focusField = null;
-            //I added selectText in wwwroot/js/notes.js
-            //this will select the field and let me edit the text directly
-            await JS.InvokeVoidAsync("selectText", titleInput);
+
+            await JS.InvokeVoidAsync(
+                "selectText",
+                titleInput);
         }
         else if (focusField == "Content")
         {
             focusField = null;
+
             await contentInput.FocusAsync();
         }
     }
 }
-

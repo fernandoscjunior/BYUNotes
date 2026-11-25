@@ -28,6 +28,7 @@ public class NotesDbContext : DbContext
         modelBuilder.Entity<OutlineNote>()
             .Property(n => n.Content)
             .HasColumnName("Content");
+            modelBuilder.Entity<MappingNote>();
 
     }
 
