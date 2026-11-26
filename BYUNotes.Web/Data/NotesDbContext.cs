@@ -30,6 +30,8 @@ public class NotesDbContext : DbContext
         modelBuilder.Entity<MappingNote>();
 
         modelBuilder.Entity<ChartingNote>();
+        
+        modelBuilder.Entity<SentenceNote>();
     }
 }
 

@@ -74,6 +74,7 @@
                 <option value="Outline">Outline Notes</option>
                 <option value="Mapping">Mapping Notes</option>
                 <option value="Charting">Charting Notes</option>
+                <option value="Sentence">Sentence Notes</option>
 
             </select>
 
@@ -229,6 +230,12 @@
                         SelectedNote="chartingNote"
                         OnDelete="DeleteNoteAsync" />
                 }
+                else if (selectedNote is SentenceNote sentenceNote)
+                {
+                    <SentenceNoteComponent @key="sentenceNote.Id"
+                                        SelectedNote="sentenceNote"
+                                        OnDelete="DeleteNoteAsync" />
+                }
             }
             else
             {
@@ -294,6 +301,7 @@
             "Outline" => new OutlineNote(),
             "Mapping" => new MappingNote(),
             "Charting" => new ChartingNote(),
+            "Sentence" => new SentenceNote(),
             _ => new TextNote()
         };
 

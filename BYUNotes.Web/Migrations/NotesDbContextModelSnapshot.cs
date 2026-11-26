@@ -125,6 +125,17 @@ namespace BYUNotes.Web.Migrations
                     b.HasDiscriminator().HasValue("OutlineNote");
                 });
 
+            modelBuilder.Entity("BYUNotes.Web.Models.SentenceNote", b =>
+                {
+                    b.HasBaseType("BYUNotes.Web.Models.Note");
+
+                    b.Property<string>("SentencesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasDiscriminator().HasValue("SentenceNote");
+                });
+
             modelBuilder.Entity("BYUNotes.Web.Models.TextNote", b =>
                 {
                     b.HasBaseType("BYUNotes.Web.Models.Note");

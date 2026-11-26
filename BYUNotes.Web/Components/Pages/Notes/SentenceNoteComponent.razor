@@ -1,0 +1,419 @@
+
+@using System.Linq
+@using System.Text.Json
+@using System.Text.RegularExpressions
+@using BYUNotes.Web.Models
+@using BYUNotes.Web.Services
+
+@inject NoteService NoteService
+
+<div class="d-flex justify-content-between align-items-center">
+    <h3 class="mb-0">Sentence Notes Editor</h3>
+
+    <div class="d-flex align-items-center gap-3">
+        @if (saveStatus == "Saved")
+        {
+            <span class="text-success">
+                <i class="bi bi-check-circle"></i> Saved
+            </span>
+        }
+        else if (saveStatus == "Saving")
+        {
+            <span class="text-muted">
+                <span class="spinner-border spinner-border-sm"></span>
+                Saving...
+            </span>
+        }
+        else if (saveStatus == "Error")
+        {
+            <span class="text-danger">
+                <i class="bi bi-exclamation-circle"></i> Save failed
+            </span>
+        }
+        else
+        {
+            <span class="text-muted">
+                <i class="bi bi-pencil"></i> Unsaved changes
+            </span>
+        }
+
+        <button type="button"
+                class="border-0 bg-transparent text-danger"
+                title="Delete note"
+                @onclick="() => OnDelete.InvokeAsync()">
+            <i class="bi bi-trash"></i>
+        </button>
+    </div>
+</div>
+
+<hr />
+
+@if (SelectedNote is not null)
+{
+    <label class="form-label">Title</label>
+
+    <input class="form-control mb-3"
+           @bind="SelectedNote.Title"
+           @bind:event="oninput"
+           @bind:after="OnNoteChanged"
+           @onblur="SaveNoteAsync" />
+
+    <div class="alert alert-light border mb-4">
+        <h6 class="mb-2">
+            <i class="bi bi-info-circle"></i>
+            Sentence Method
+        </h6>
+
+        <p class="mb-0 text-muted">
+            Record each new idea as a separate numbered sentence.
+            Keep your notes concise and organize them in a logical order.
+        </p>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Sentences</h5>
+
+        <button type="button"
+                class="btn btn-primary btn-sm"
+                @onclick="AddSentenceAsync">
+            <i class="bi bi-plus-lg"></i>
+            Add Sentence
+        </button>
+    </div>
+
+    @if (sentences.Count == 0)
+    {
+        <div class="text-center text-muted border rounded p-4 mb-3">
+            <i class="bi bi-journal-text fs-2"></i>
+
+            <p class="mt-2 mb-0">
+                No sentences yet. Add your first sentence to get started.
+            </p>
+        </div>
+    }
+
+    @for (int i = 0; i < sentences.Count; i++)
+    {
+        var index = i;
+        var sentence = sentences[index];
+
+        <div @key="sentence.Id"
+             class="d-flex align-items-start gap-2 border rounded p-3 mb-3">
+
+            <div class="fw-bold text-primary pt-2"
+                 style="min-width: 35px;">
+                @(index + 1).
+            </div>
+
+            <div class="flex-grow-1" style="min-width: 0;">
+                <textarea class="form-control"
+                          rows="2"
+                          placeholder="Enter a sentence or idea..."
+                          @bind="sentence.Content"
+                          @bind:event="oninput"
+                          @bind:after="OnNoteChanged"
+                          @onblur="SaveNoteAsync">
+                </textarea>
+            </div>
+
+            <div class="d-flex flex-column gap-1">
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        title="Move sentence up"
+                        disabled="@(index == 0)"
+                        @onclick="() => MoveSentenceAsync(index, -1)">
+                    <i class="bi bi-chevron-up"></i>
+                </button>
+
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        title="Move sentence down"
+                        disabled="@(index == sentences.Count - 1)"
+                        @onclick="() => MoveSentenceAsync(index, 1)">
+                    <i class="bi bi-chevron-down"></i>
+                </button>
+            </div>
+
+            <button type="button"
+                    class="btn btn-outline-danger btn-sm"
+                    title="Delete sentence"
+                    @onclick="() => DeleteSentenceAsync(sentence.Id)">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    }
+
+    <button type="button"
+            class="btn btn-outline-primary mb-3"
+            @onclick="AddSentenceAsync">
+        <i class="bi bi-plus-lg"></i>
+        Add Sentence
+    </button>
+
+    <hr />
+
+    <div class="d-flex justify-content-between flex-wrap text-muted small">
+        <span>
+            @sentences.Count sentences |
+            @WordCount words
+        </span>
+
+        <span>
+            Last edited:
+            @SelectedNote.LastEdited.ToString("MMM dd, yyyy h:mm tt")
+        </span>
+    </div>
+
+    @* Hidden preview for PNG, PDF and HTML exports *@
+
+    <div aria-hidden="true"
+         style="position: fixed;
+                left: -10000px;
+                top: 0;
+                pointer-events: none;">
+
+        <div id="note-export-preview"
+             style="width: 800px;
+                    min-height: 400px;
+                    padding: 40px;
+                    box-sizing: border-box;
+                    background: #ffffff;
+                    color: #212529;
+                    font-family: Arial, sans-serif;">
+
+            <div style="color: #64748b;
+                        font-size: 13px;
+                        font-weight: bold;
+                        letter-spacing: 1px;
+                        margin-bottom: 15px;">
+                BYUNOTES | SENTENCE NOTES
+            </div>
+
+            <h1 style="font-size: 32px;
+                       font-weight: bold;
+                       color: #172554;
+                       overflow-wrap: anywhere;
+                       margin-bottom: 10px;">
+
+                @(string.IsNullOrWhiteSpace(SelectedNote.Title)
+                    ? "Untitled Note"
+                    : SelectedNote.Title)
+            </h1>
+
+            <p style="font-size: 13px;
+                      color: #64748b;
+                      margin-bottom: 20px;">
+
+                Last edited:
+                @SelectedNote.LastEdited.ToString("MMMM dd, yyyy h:mm tt")
+            </p>
+
+            <div style="border-top: 2px solid #2563eb;
+                        margin-bottom: 25px;">
+            </div>
+
+            @if (sentences.Count == 0)
+            {
+                <p style="color: #64748b;">
+                    No sentences recorded.
+                </p>
+            }
+
+            @for (int i = 0; i < sentences.Count; i++)
+            {
+                var sentence = sentences[i];
+
+                <div @key="sentence.Id"
+                     style="display: flex;
+                            align-items: flex-start;
+                            gap: 15px;
+                            padding: 15px;
+                            margin-bottom: 12px;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 8px;
+                            background: #f8fafc;">
+
+                    <div style="font-size: 17px;
+                                font-weight: bold;
+                                color: #2563eb;
+                                min-width: 30px;">
+                        @(i + 1).
+                    </div>
+
+                    <div style="flex: 1;
+                                min-width: 0;
+                                font-size: 16px;
+                                line-height: 1.7;
+                                white-space: pre-wrap;
+                                overflow-wrap: anywhere;">
+                        @sentence.Content
+                    </div>
+                </div>
+            }
+
+            <div style="font-size: 13px;
+                        color: #64748b;
+                        margin-top: 25px;">
+                @sentences.Count sentences | @WordCount words
+            </div>
+
+            <div style="border-top: 1px solid #e2e8f0;
+                        margin-top: 35px;
+                        padding-top: 15px;
+                        text-align: center;
+                        color: #64748b;
+                        font-size: 12px;">
+                Exported from BYUNotes
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public SentenceNote SelectedNote { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    private List<SentenceEntry> sentences = new();
+
+    private SentenceNote? loadedNote;
+
+    private string saveStatus = "Saved";
+
+    private int WordCount =>
+        sentences.Sum(sentence =>
+            Regex.Matches(sentence.Content ?? "", @"\S+").Count);
+
+    protected override void OnParametersSet()
+    {
+        if (SelectedNote is null ||
+            ReferenceEquals(loadedNote, SelectedNote))
+        {
+            return;
+        }
+
+        loadedNote = SelectedNote;
+
+        try
+        {
+            sentences = JsonSerializer.Deserialize<List<SentenceEntry>>(
+                string.IsNullOrWhiteSpace(SelectedNote.SentencesJson)
+                    ? "[]"
+                    : SelectedNote.SentencesJson
+            ) ?? new List<SentenceEntry>();
+
+            var usedIds = new HashSet<Guid>();
+
+            foreach (var sentence in sentences)
+            {
+                while (sentence.Id == Guid.Empty ||
+                       !usedIds.Add(sentence.Id))
+                {
+                    sentence.Id = Guid.NewGuid();
+                }
+
+                sentence.Content ??= "";
+            }
+
+            saveStatus = "Saved";
+        }
+        catch (JsonException ex)
+        {
+            sentences = new List<SentenceEntry>();
+            saveStatus = "Error";
+
+            Console.WriteLine(
+                $"SENTENCE NOTE LOAD ERROR: {ex}");
+        }
+    }
+
+    private void SyncSentences()
+    {
+        SelectedNote.SentencesJson =
+            JsonSerializer.Serialize(sentences);
+    }
+
+    private void OnNoteChanged()
+    {
+        SyncSentences();
+        saveStatus = "Unsaved";
+    }
+
+    private async Task AddSentenceAsync()
+    {
+        sentences.Add(new SentenceEntry());
+
+        OnNoteChanged();
+
+        await SaveNoteAsync();
+    }
+
+    private async Task DeleteSentenceAsync(Guid sentenceId)
+    {
+        sentences.RemoveAll(sentence =>
+            sentence.Id == sentenceId);
+
+        OnNoteChanged();
+
+        await SaveNoteAsync();
+    }
+
+    private async Task MoveSentenceAsync(
+        int index,
+        int direction)
+    {
+        int newIndex = index + direction;
+
+        if (index < 0 ||
+            index >= sentences.Count ||
+            newIndex < 0 ||
+            newIndex >= sentences.Count)
+        {
+            return;
+        }
+
+        var sentence = sentences[index];
+
+        sentences.RemoveAt(index);
+        sentences.Insert(newIndex, sentence);
+
+        OnNoteChanged();
+
+        await SaveNoteAsync();
+    }
+
+    private async Task SaveNoteAsync()
+    {
+        if (SelectedNote is null ||
+            saveStatus == "Saved" ||
+            saveStatus == "Saving")
+        {
+            return;
+        }
+
+        saveStatus = "Saving";
+
+        try
+        {
+            SyncSentences();
+
+            SelectedNote.LastEdited = DateTime.Now;
+
+            await NoteService.SaveNoteAsync(SelectedNote);
+
+            if (saveStatus == "Saving")
+            {
+                saveStatus = "Saved";
+            }
+        }
+        catch (Exception ex)
+        {
+            saveStatus = "Error";
+
+            Console.WriteLine(
+                $"SENTENCE NOTE SAVE ERROR: {ex}");
+        }
+    }
+}
