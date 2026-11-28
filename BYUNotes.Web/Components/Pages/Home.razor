@@ -28,6 +28,24 @@
                    @bind="searchText"
                    @bind:event="oninput" />
 
+            <label class="form-label" for="subjectFilter">Subject</label>
+            <select id="subjectFilter" class="form-select mb-2" @bind="subjectFilter">
+                <option value="">All subjects</option>
+                @foreach (var subject in subjects)
+                {
+                    <option value="@subject">@subject</option>
+                }
+            </select>
+
+            <label class="form-label" for="labelFilter">Label</label>
+            <select id="labelFilter" class="form-select mb-3" @bind="labelFilter">
+                <option value="">All labels</option>
+                @foreach (var label in labels)
+                {
+                    <option value="@label.Id">@label.Name</option>
+                }
+            </select>
+
             @if (notes.Count == 0)
             {
                 <p class="text-muted">
@@ -42,22 +60,39 @@
             }
             else
             {
-    @foreach (var note in filteredNotes)
-    {
-            <button type="button"
-                            @key="note.Id"
-                            class="btn mb-2 text-start 
-                            @(selectedNote?.Id == note.Id ? "btn-primary" : "btn-outline-primary")"
-                    style="transition: none;"                            
-                    @onclick="() => SelectNote(note)">
+                @foreach (var group in groupedNotes)
+                {
+                    <h5 class="mt-2">@(group.Key == "" ? "No subject" : group.Key)</h5>
+                    @foreach (var note in group)
+                    {
+                        <button type="button"
+                                @key="note.Id"
+                                class="btn mb-2 text-start @(selectedNote?.Id == note.Id ? "btn-primary" : "btn-outline-primary")"
+                                style="transition: none;"   
+                                @onclick="() => SelectNote(note)">
 
-                <strong>@note.Title</strong>
-                <br />
-                <small>
-                    Edited: @note.LastEdited.ToString("MMM dd, yyyy h:mm tt")
-                </small>
-            </button>
-    }
+                            <strong>@note.Title</strong>
+                            <br />
+
+                            <small>
+                                Edited: @note.LastEdited.ToString("MMM dd, yyyy h:mm tt")
+                            </small>
+                            @if (note.NoteLabels.Count > 0)
+                            {
+                                <span class="d-block mt-1">
+                                    @foreach (var noteLabel in note.NoteLabels)
+                                    {
+                                        <span class="badge rounded-pill me-1"
+                                              style="background-color: @noteLabel.Label.Color">
+                                            @noteLabel.Label.Name
+                                        </span>
+                                    }
+                                </span>
+                            }
+
+                        </button>
+                    }
+                }
             }
 
             <hr />
@@ -74,6 +109,7 @@
                 <option value="Outline">Outline Notes</option>
                 <option value="Mapping">Mapping Notes</option>
                 <option value="Charting">Charting Notes</option>
+                <option value="Sentence">Sentence Notes</option>
 
             </select>
 
@@ -94,6 +130,93 @@
 
             @if (selectedNote is not null)
             {
+                <div class="border rounded p-3 mb-3">
+                    <h5>Organize note</h5>
+
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col">
+                            <label class="form-label" for="noteSubject">Class subject</label>
+                            <input id="noteSubject"
+                                   class="form-control"
+                                   placeholder="e.g. Biology 101"
+                                   @bind="selectedNote.Subject"
+                                   @bind:event="oninput" />
+                        </div>
+                        <div class="col-auto">
+                            <button type="button"
+                                    class="btn btn-outline-primary"
+                                    @onclick="SaveSubjectAsync">
+                                Save subject
+                            </button>
+                        </div>
+                    </div>
+
+                    <label class="form-label">Labels</label>
+                    @if (labels.Count == 0)
+                    {
+                        <p class="text-muted mb-2">Create a label to organize this note.</p>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            @foreach (var label in labels)
+                            {
+                                var isAssigned = selectedNote.NoteLabels.Any(noteLabel => noteLabel.LabelId == label.Id);
+                                <div class="border rounded px-2 py-1 d-flex align-items-center gap-2">
+                                    <input id="label-@label.Id"
+                                           class="form-check-input m-0"
+                                           type="checkbox"
+                                           checked="@isAssigned"
+                                           @onchange="args => SetLabelAssignmentAsync(label, args)" />
+                                    <label class="mb-0" for="label-@label.Id">
+                                        <span class="badge rounded-pill"
+                                              style="background-color: @label.Color">
+                                            @label.Name
+                                        </span>
+                                    </label>
+                                    <button type="button"
+                                            class="btn btn-sm btn-link text-danger p-0 ms-1"
+                                            title="Delete label"
+                                            @onclick="() => DeleteLabelAsync(label)">
+                                        Delete
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <div class="row g-2 align-items-end">
+                        <div class="col">
+                            <label class="form-label" for="newLabelName">New label</label>
+                            <input id="newLabelName"
+                                   class="form-control"
+                                   @bind="newLabelName"
+                                   placeholder="e.g. Exam review" />
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label" for="newLabelColor">Color</label>
+                            <input id="newLabelColor"
+                                   class="form-control form-control-color"
+                                   type="color"
+                                   @bind="newLabelColor" />
+                        </div>
+                        <div class="col-auto">
+                            <button type="button"
+                                    class="btn btn-success"
+                                    @onclick="CreateLabelAsync">
+                                Create and assign
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(organizationError))
+                    {
+                        <div class="alert alert-danger mt-3 mb-0" role="alert">
+                            @organizationError
+                        </div>
+                    }
+                </div>
+
                 <!-- UNIVERSAL EXPORT MENU -->
                 <div class="d-flex justify-content-end mb-3">
 
@@ -190,7 +313,7 @@
                 {
                     <CornellNoteComponent
                         @key="cornellNote.Id"
-                        SelectedNote="cornellNote"
+                        SelectedNote="@cornellNote"
                         OnDelete="DeleteNoteAsync"
                         FocusField="@focusField" />
                 }
@@ -200,7 +323,7 @@
                 {
                     <TextNoteComponent
                         @key="textNote.Id"
-                        SelectedNote="textNote"
+                        SelectedNote="@textNote"
                         OnDelete="DeleteNoteAsync"
                         FocusField="@focusField"  />
                 }
@@ -209,7 +332,7 @@
                 {
                     <OutlineNoteComponent
                         @key="outlineNote.Id"
-                        SelectedNote="outlineNote"
+                        SelectedNote="@outlineNote"
                         OnDelete="DeleteNoteAsync"
                         FocusField="@focusField" />
                 }
@@ -219,7 +342,7 @@
                 {
                     <MappingNoteComponent
                         @key="mappingNote.Id"
-                        SelectedNote="mappingNote"
+                        SelectedNote="@mappingNote"
                         OnDelete="DeleteNoteAsync"
                         FocusField="@focusField" />
                 }
@@ -229,9 +352,18 @@
                 {
                     <ChartingNoteComponent
                         @key="chartingNote.Id"
-                        SelectedNote="chartingNote"
-                        OnDelete="DeleteNoteAsync"
-                        FocusField="@focusField"  />
+                        SelectedNote="@chartingNote"
+                        OnDelete="DeleteNoteAsync" 
+                        FocusField="@focusField" />
+                }
+                else if (selectedNote is SentenceNote sentenceNote)
+                {
+                    <SentenceNoteComponent
+                     @key="sentenceNote.Id"
+                     SelectedNote="sentenceNote"
+                     OnDelete="DeleteNoteAsync"
+                     FocusField="@focusField"
+                         />
                 }
             }
             else
@@ -252,6 +384,7 @@
 @code {
 
     private List<Note> notes = new();
+    private List<Label> labels = new();
 
     private Note? selectedNote;
 
@@ -259,21 +392,43 @@
 
     private string newNoteType = "Text";
     private string searchText = "";
+    private string subjectFilter = "";
+    private string labelFilter = "";
+    private string newLabelName = "";
+    private string newLabelColor = "#0d6efd";
+    private string organizationError = "";
 
     private bool showExportMenu = false;
     private bool isExporting = false;
 
     private string exportError = "";
 
+    private IEnumerable<string> subjects =>
+        notes.Select(note => note.Subject.Trim())
+            .Where(subject => !string.IsNullOrWhiteSpace(subject))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(subject => subject);
+
     private IEnumerable<Note> filteredNotes =>
         notes.Where(note =>
-            (note.Title ?? "").Contains(
-                searchText ?? "",
-                StringComparison.OrdinalIgnoreCase));
+            (string.IsNullOrWhiteSpace(searchText)
+                || (note.Title ?? "").Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                || note.NoteLabels.Any(noteLabel =>
+                    noteLabel.Label.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)))
+            && (string.IsNullOrWhiteSpace(subjectFilter)
+                || string.Equals(note.Subject, subjectFilter, StringComparison.OrdinalIgnoreCase))
+            && (string.IsNullOrWhiteSpace(labelFilter)
+                || note.NoteLabels.Any(noteLabel => noteLabel.LabelId.ToString() == labelFilter)));
+
+    private IEnumerable<IGrouping<string, Note>> groupedNotes =>
+        filteredNotes
+            .GroupBy(note => note.Subject.Trim())
+            .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase);
 
     protected override async Task OnInitializedAsync()
     {
         await LoadNotesAsync();
+        labels = await NoteService.LoadLabelsAsync();
     }
 
     private async Task LoadNotesAsync()
@@ -291,6 +446,93 @@
 
         showExportMenu = false;
         exportError = "";
+        organizationError = "";
+    }
+
+    private async Task SaveSubjectAsync()
+    {
+        if (selectedNote is null)
+            return;
+
+        selectedNote.Subject = selectedNote.Subject.Trim();
+        await NoteService.SaveNoteAsync(selectedNote);
+        organizationError = "";
+    }
+
+    private async Task SetLabelAssignmentAsync(Label label, ChangeEventArgs args)
+    {
+        if (selectedNote is null)
+            return;
+
+        var isAssigned = args.Value is bool value && value;
+        var assignedIds = selectedNote.NoteLabels
+            .Select(noteLabel => noteLabel.LabelId)
+            .ToHashSet();
+
+        if (isAssigned)
+            assignedIds.Add(label.Id);
+        else
+            assignedIds.Remove(label.Id);
+
+        await NoteService.SetNoteLabelsAsync(selectedNote.Id, assignedIds);
+
+        selectedNote.NoteLabels.RemoveAll(noteLabel => noteLabel.LabelId == label.Id);
+        if (isAssigned)
+        {
+            selectedNote.NoteLabels.Add(new NoteLabel
+            {
+                NoteId = selectedNote.Id,
+                LabelId = label.Id,
+                Label = label
+            });
+        }
+
+        organizationError = "";
+    }
+
+    private async Task CreateLabelAsync()
+    {
+        try
+        {
+            var label = await NoteService.CreateLabelAsync(newLabelName, newLabelColor);
+            labels.Add(label);
+            newLabelName = "";
+
+            if (selectedNote is not null)
+            {
+                await NoteService.SetNoteLabelsAsync(
+                    selectedNote.Id,
+                    selectedNote.NoteLabels.Select(noteLabel => noteLabel.LabelId).Append(label.Id));
+
+                selectedNote.NoteLabels.Add(new NoteLabel
+                {
+                    NoteId = selectedNote.Id,
+                    LabelId = label.Id,
+                    Label = label
+                });
+            }
+
+            organizationError = "";
+        }
+        catch (ArgumentException ex)
+        {
+            organizationError = ex.Message;
+        }
+        catch (InvalidOperationException ex)
+        {
+            organizationError = ex.Message;
+        }
+    }
+
+    private async Task DeleteLabelAsync(Label label)
+    {
+        await NoteService.DeleteLabelAsync(label.Id);
+        labels.Remove(label);
+
+        foreach (var note in notes)
+            note.NoteLabels.RemoveAll(noteLabel => noteLabel.LabelId == label.Id);
+
+        organizationError = "";
     }
 
     private async Task CreateNoteAsync()
@@ -302,6 +544,7 @@
             "Outline" => new OutlineNote(),
             "Mapping" => new MappingNote(),
             "Charting" => new ChartingNote(),
+            "Sentence" => new SentenceNote(),
             _ => new TextNote()
         };
 

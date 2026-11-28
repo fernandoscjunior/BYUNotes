@@ -58,6 +58,10 @@ namespace BYUNotes.Web.Migrations
                     b.Property<DateTime>("LastEdited")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -69,6 +73,40 @@ namespace BYUNotes.Web.Migrations
                     b.HasDiscriminator().HasValue("Note");
 
                     b.UseTphMappingStrategy();
+                });
+
+            modelBuilder.Entity("BYUNotes.Web.Models.Label", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Labels");
+                });
+
+            modelBuilder.Entity("BYUNotes.Web.Models.NoteLabel", b =>
+                {
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("LabelId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("NoteId", "LabelId");
+
+                    b.HasIndex("LabelId");
+
+                    b.ToTable("NoteLabels");
                 });
 
             modelBuilder.Entity("BYUNotes.Web.Models.ChartingNote", b =>
@@ -125,6 +163,17 @@ namespace BYUNotes.Web.Migrations
                     b.HasDiscriminator().HasValue("OutlineNote");
                 });
 
+            modelBuilder.Entity("BYUNotes.Web.Models.SentenceNote", b =>
+                {
+                    b.HasBaseType("BYUNotes.Web.Models.Note");
+
+                    b.Property<string>("SentencesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasDiscriminator().HasValue("SentenceNote");
+                });
+
             modelBuilder.Entity("BYUNotes.Web.Models.TextNote", b =>
                 {
                     b.HasBaseType("BYUNotes.Web.Models.Note");
@@ -145,9 +194,38 @@ namespace BYUNotes.Web.Migrations
                         .HasForeignKey("CornellNoteId");
                 });
 
+            modelBuilder.Entity("BYUNotes.Web.Models.NoteLabel", b =>
+                {
+                    b.HasOne("BYUNotes.Web.Models.Label", "Label")
+                        .WithMany("NoteLabels")
+                        .HasForeignKey("LabelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BYUNotes.Web.Models.Note", "Note")
+                        .WithMany("NoteLabels")
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Label");
+
+                    b.Navigation("Note");
+                });
+
             modelBuilder.Entity("BYUNotes.Web.Models.CornellNote", b =>
                 {
                     b.Navigation("Cues");
+                });
+
+            modelBuilder.Entity("BYUNotes.Web.Models.Label", b =>
+                {
+                    b.Navigation("NoteLabels");
+                });
+
+            modelBuilder.Entity("BYUNotes.Web.Models.Note", b =>
+                {
+                    b.Navigation("NoteLabels");
                 });
 #pragma warning restore 612, 618
         }
