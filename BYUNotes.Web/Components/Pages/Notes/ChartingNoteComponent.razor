@@ -2,7 +2,9 @@
 @using System.Text.Json
 @using BYUNotes.Web.Models
 @using BYUNotes.Web.Services
+@using Microsoft.EntityFrameworkCore.Metadata.Internal
 @inject NoteService NoteService
+@inject IJSRuntime JS
 
 <div class="d-flex justify-content-between align-items-center">
     <h3 class="mb-0">Charting Notes Editor</h3>
@@ -52,6 +54,7 @@
     <input class="form-control mb-3"
            @bind="SelectedNote.Title"
            @bind:event="oninput"
+           @ref="titleInput"
            @bind:after="OnNoteChanged"
            @onblur="SaveNoteAsync" />
 
@@ -127,13 +130,18 @@
                         @for (int c = 0; c < columns.Count; c++)
                         {
                             var columnIndex = c;
-
+                            var key =  $"{row.Id}~{c}";
                             <td>
                                 <textarea class="form-control"
                                           rows="3"
                                           style="min-width: 160px; resize: vertical;"
                                           placeholder="Enter notes..."
                                           value="@row.Cells[columnIndex]"
+                                          @ref="contentInputs[key]"
+                                          @onfocus="() => {
+                                            currentRowId = rowIndex;
+                                            currentColumnId = columnIndex;
+                                            }"
                                           @oninput="e => UpdateCell(rowIndex, columnIndex, e.Value?.ToString())"
                                           @onblur="SaveNoteAsync"></textarea>
                             </td>
@@ -299,6 +307,17 @@
     [Parameter]
     public EventCallback OnDelete { get; set; }
 
+    [Parameter]
+    public string? FocusField { get; set; }    
+
+    int currentRowId = -1;
+    int currentColumnId = -1;
+    int newRowId = -1;
+    int newColumnId = -1;
+    private ElementReference titleInput = new();
+
+    private Dictionary<string, ElementReference> contentInputs = new();    
+
     private List<string> columns = new();
     private List<ChartingRow> rows = new();
 
@@ -398,7 +417,9 @@
 
     private async Task AddColumnAsync()
     {
-        columns.Add($"Column {columns.Count + 1}");
+        var newColumnCnt = columns.Count + 1;
+        newColumnId = columns.Count;//since index is 1 less than count
+        columns.Add($"Column {newColumnCnt}");
 
         foreach (var row in rows)
         {
@@ -416,8 +437,13 @@
         {
             return;
         }
+        foreach (var row in rows)
+        {
+            contentInputs.Remove($"{row.Id}~{index}");
+        }
 
         columns.RemoveAt(index);
+        newColumnId = index - 1;
 
         foreach (var row in rows)
         {
@@ -431,11 +457,12 @@
 
     private async Task AddRowAsync()
     {
+        int rowCnt = rows.Count;
         rows.Add(new ChartingRow
         {
             Cells = Enumerable.Repeat("", columns.Count).ToList()
         });
-
+        newRowId = rowCnt;//because index is 1 less
         OnNoteChanged();
 
         await SaveNoteAsync();
@@ -443,8 +470,14 @@
 
     private async Task DeleteRowAsync(int index)
     {
+        var row= rows[index];
+        for (int c = 0; c < columns.Count; c++)
+        {
+            contentInputs.Remove($"{row.Id}~{c}");
+        }
+        int rowCnt = rows.Count-1;
         rows.RemoveAt(index);
-
+        newRowId = rowCnt - 1;
         OnNoteChanged();
 
         await SaveNoteAsync();
@@ -498,4 +531,54 @@
                 $"CHARTING NOTE SAVE ERROR: {ex}");
         }
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (newRowId != -1)
+        {
+            var index = newRowId;
+            newRowId = -1;      
+            if (index >= 0 && index < rows.Count)
+            {
+                var key = $"{rows[index].Id}~0";
+
+                if (contentInputs.TryGetValue(key, out var input))
+                {
+                    await input.FocusAsync();
+                }
+            }
+        }
+        if (newColumnId != -1)
+        {
+
+            var columnIndex = newColumnId;
+            var rowIndex = currentRowId;
+            if (columnIndex >= 0 && columnIndex < columns.Count)
+            {
+                var key = $"{rows[rowIndex].Id}~{columnIndex}";
+
+                if (contentInputs.TryGetValue(key, out var input))
+                {
+                    await input.FocusAsync();
+                }
+            }
+            newColumnId = -1;   
+        }        
+        if (!firstRender)
+            return;
+        if (FocusField == "Title")
+        {
+            await JS.InvokeVoidAsync("selectText", titleInput);
+        }
+        if (FocusField == "Content")
+        {
+            if (rows.Count > 1 && columns.Count > 1)
+            {
+                var key = $"{rows[0].Id}~0";
+                await contentInputs[key].FocusAsync();
+            }
+        }      
+        FocusField = null;  
+    }            
+
 }

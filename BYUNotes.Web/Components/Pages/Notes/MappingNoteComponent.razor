@@ -28,8 +28,9 @@
 <label class="form-label">Title</label>
 
 <input class="form-control mb-3"
-       @bind="SelectedNote.Title"
+       @bind="SelectedNote.Title"       
        @bind:event="oninput"
+       @ref="titleInput"
        @bind:after="OnNoteChanged"
        @onblur="SaveNoteAsync" />
 
@@ -54,6 +55,7 @@
                 <input class="form-control mb-3"
                        placeholder="Enter your main topic..."
                        @bind="SelectedNote.CentralTopic"
+                       @ref="contentInput"
                        @bind:event="oninput"
                        @bind:after="OnNoteChanged"
                        @onblur="SaveNoteAsync" />
@@ -627,6 +629,13 @@
     [Parameter]
     public EventCallback OnDelete { get; set; }
 
+    [Parameter]
+    public string? FocusField { get; set; }
+
+    private ElementReference titleInput = new();
+
+    private ElementReference contentInput = new();
+
     private List<MappingBranch> branches = new();
 
     private Guid? loadedNoteId;
@@ -746,7 +755,19 @@
 
             jsInitialized = true;
         }
-    }
+        if (!firstRender)
+            return;
+            
+        if (FocusField == "Title")
+        {
+            await JS.InvokeVoidAsync("selectText", titleInput);
+        }
+        if (FocusField == "Content")
+        {
+            await contentInput.FocusAsync();
+        }      
+        FocusField = null;  
+    }            
 
     // RECEIVE DRAGGED POSITIONS FROM JAVASCRIPT
 

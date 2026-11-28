@@ -4,7 +4,7 @@
 @using System.Text.RegularExpressions
 @using BYUNotes.Web.Models
 @using BYUNotes.Web.Services
-
+@inject IJSRuntime JS
 @inject NoteService NoteService
 
 <div class="d-flex justify-content-between align-items-center">
@@ -54,6 +54,7 @@
 
     <input class="form-control mb-3"
            @bind="SelectedNote.Title"
+            @ref="titleInput"
            @bind:event="oninput"
            @bind:after="OnNoteChanged"
            @onblur="SaveNoteAsync" />
@@ -110,6 +111,7 @@
                           rows="2"
                           placeholder="Enter a sentence or idea..."
                           @bind="sentence.Content"
+                          @ref="contentInputs[sentence.Id]"
                           @bind:event="oninput"
                           @bind:after="OnNoteChanged"
                           @onblur="SaveNoteAsync">
@@ -276,6 +278,14 @@
     [Parameter]
     public EventCallback OnDelete { get; set; }
 
+    [Parameter]
+    public string? FocusField { get; set; }
+
+    private ElementReference titleInput = new();
+
+    private Dictionary<Guid, ElementReference> contentInputs = new();
+
+    private Guid newSentenceKey = Guid.Empty;
     private List<SentenceEntry> sentences = new();
 
     private SentenceNote? loadedNote;
@@ -343,8 +353,9 @@
 
     private async Task AddSentenceAsync()
     {
-        sentences.Add(new SentenceEntry());
-
+        var newSentence = new SentenceEntry();
+        newSentenceKey = newSentence.Id;
+        sentences.Add(newSentence);        
         OnNoteChanged();
 
         await SaveNoteAsync();
@@ -352,6 +363,14 @@
 
     private async Task DeleteSentenceAsync(Guid sentenceId)
     {
+        int index = sentences.FindIndex(r => r.Id == sentenceId);
+
+        contentInputs.Remove(sentenceId);
+        var newIndex = index - 1;
+        if (newIndex >= 0 && newIndex < sentences.Count)
+        {
+            newSentenceKey = sentences[newIndex].Id;
+        }
         sentences.RemoveAll(sentence =>
             sentence.Id == sentenceId);
 
@@ -416,4 +435,33 @@
                 $"SENTENCE NOTE SAVE ERROR: {ex}");
         }
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        //This is for adding a new row
+        if (newSentenceKey != Guid.Empty)
+        {
+            await contentInputs[newSentenceKey].FocusAsync();
+            newSentenceKey = Guid.Empty;
+        }     
+        if (!firstRender)
+            return;       
+        if (FocusField == "Title")
+        {
+            await JS.InvokeVoidAsync("selectText", titleInput);
+        }
+        if (FocusField == "Content")
+        {
+            if (sentences.Count > 0)
+            {    
+                var firstSentence = sentences[0];
+
+                await contentInputs[firstSentence.Id].FocusAsync();
+            }
+            else 
+                await titleInput.FocusAsync();
+        }      
+        FocusField = null;  
+
+    }         
 }
