@@ -98,6 +98,7 @@
                                       rows="3"
                                       placeholder="Enter a question or keyword..."
                                       @bind="cue.Cue"
+                                      @ref="contentInputs[cue.Id]"
                                       @bind:event="oninput"
                                       @bind:after="OnNoteChanged"
                                       @onblur="SaveNoteAsync"></textarea>
@@ -109,7 +110,6 @@
                             <textarea class="form-control mb-2"
                                       rows="5"
                                       placeholder="Write your detailed notes..."
-                                      @ref="contentInput"
                                       @bind="cue.Content"
                                       @bind:event="oninput"
                                       @bind:after="OnNoteChanged"
@@ -253,11 +253,11 @@
 
                                 <!-- Narrow cue column -->
 
-                                <div class="col-4 p-3"
+                                <textarea class="col-4 p-3"
                                      style="background: #f8fafc;
                                             border-right: 2px solid #64748b;
                                             white-space: pre-wrap;
-                                            overflow-wrap: anywhere;"><strong>@cue.Cue</strong></div>
+                                            overflow-wrap: anywhere;"><strong>@cue.Cue</strong></textarea>
 
                                 <!-- Wide notes column -->
 
@@ -503,9 +503,11 @@
     [Parameter]
     public EventCallback OnDelete { get; set; }
 
-    private ElementReference titleInput;
-    private ElementReference contentInput;
-    private string? focusField;
+    private ElementReference titleInput = new();
+    //This is the Cue, references te Id  of CornellNoteDetails
+    private Dictionary<Guid, ElementReference> contentInputs = new();
+
+    private Guid newCueKey = Guid.Empty;
     private string saveStatus = "Saved";
 
     private async Task SaveNoteAsync()
@@ -532,13 +534,16 @@
 
     private async Task AddDetail()
     {
-        selectedNote.Cues.Add(new CornellNoteDetail
+        var newNote = new CornellNoteDetail
         {
             CueSequence = selectedNote.Cues
                 .Select(c => c.CueSequence)
                 .DefaultIfEmpty(0)
                 .Max() + 1
-        });
+        };
+        newCueKey = newNote.Id;
+        selectedNote.Cues.Add(newNote);
+
 
         await SaveNoteAsync();
     }
@@ -548,24 +553,58 @@
         saveStatus = "Unsaved";
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (focusField == "Title")
-        {
-            focusField = null;
-            await JS.InvokeVoidAsync("selectText", titleInput);
-        }
-        else if (focusField == "Content")
-        {
-            focusField = null;
-            await contentInput.FocusAsync();
-        }
-    }
+
 
     private async Task RemoveDetail(CornellNoteDetail cue)
     {
         selectedNote.Cues.Remove(cue);
 
+        //Select the previous note
+        var prevCueSequence = cue.CueSequence - 1;
+        var selectedCue = selectedNote.Cues
+        .Where(c => c.CueSequence == prevCueSequence).FirstOrDefault();
+        if (selectedCue != null)
+        {
+            await contentInputs[selectedCue.Id].FocusAsync();
+        }
+        else
+        {
+            await titleInput.FocusAsync();
+        }
+
+        contentInputs.Remove(cue.Id);
         await SaveNoteAsync();
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        //This is for adding a new row
+        if (newCueKey != Guid.Empty)
+        {
+            await contentInputs[newCueKey].FocusAsync();
+            newCueKey = Guid.Empty;
+        }     
+        if (!firstRender)
+            return;       
+        if (FocusField == "Title")
+        {
+            await JS.InvokeVoidAsync("selectText", titleInput);
+        }
+        if (FocusField == "Content")
+        {
+            if (selectedNote.Cues.Count > 0)
+            {    
+                var firstCue = selectedNote.Cues
+                .OrderBy(x => x.CueSequence)
+                .First();
+
+                await contentInputs[firstCue.Id].FocusAsync();
+            }
+            else 
+                await titleInput.FocusAsync();
+        }      
+        FocusField = null;  
+
+    }            
+
 }

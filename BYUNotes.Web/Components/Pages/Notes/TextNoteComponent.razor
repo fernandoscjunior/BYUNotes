@@ -175,7 +175,7 @@
     private ElementReference titleInput;
     private ElementReference contentInput;
 
-    private string? focusField;
+    //private string? focusField;
     private string saveStatus = "Saved";
 
     private async Task SaveNoteAsync()
@@ -206,21 +206,22 @@
         saveStatus = "Unsaved";
     }
 
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (focusField == "Title")
+        //This prevents it from refreshing when I pick a note type in the dropdown
+        if (!firstRender)
+            return;
+        if (FocusField == "Title")
         {
-            focusField = null;
-
             await JS.InvokeVoidAsync(
                 "selectText",
                 titleInput);
         }
-        else if (focusField == "Content")
+        else if (FocusField == "Content")
         {
-            focusField = null;
-
             await contentInput.FocusAsync();
         }
+        FocusField = null;
     }
 }

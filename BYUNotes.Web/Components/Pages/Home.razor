@@ -42,22 +42,22 @@
             }
             else
             {
-                @foreach (var note in filteredNotes)
-                {
-                    <button type="button"
+    @foreach (var note in filteredNotes)
+    {
+            <button type="button"
                             @key="note.Id"
-                            class="btn mb-2 text-start @(selectedNote?.Id == note.Id ? "btn-primary" : "btn-outline-primary")"
-                            @onclick="() => SelectNote(note)">
+                            class="btn mb-2 text-start 
+                            @(selectedNote?.Id == note.Id ? "btn-primary" : "btn-outline-primary")"
+                    style="transition: none;"                            
+                    @onclick="() => SelectNote(note)">
 
-                        <strong>@note.Title</strong>
-                        <br />
-
-                        <small>
-                            Edited: @note.LastEdited.ToString("MMM dd, yyyy h:mm tt")
-                        </small>
-
-                    </button>
-                }
+                <strong>@note.Title</strong>
+                <br />
+                <small>
+                    Edited: @note.LastEdited.ToString("MMM dd, yyyy h:mm tt")
+                </small>
+            </button>
+    }
             }
 
             <hr />
@@ -191,7 +191,8 @@
                     <CornellNoteComponent
                         @key="cornellNote.Id"
                         SelectedNote="cornellNote"
-                        OnDelete="DeleteNoteAsync" />
+                        OnDelete="DeleteNoteAsync"
+                        FocusField="@focusField" />
                 }
 
                 <!-- TEXT NOTES -->
@@ -200,16 +201,17 @@
                     <TextNoteComponent
                         @key="textNote.Id"
                         SelectedNote="textNote"
-                        OnDelete="DeleteNoteAsync" />
+                        OnDelete="DeleteNoteAsync"
+                        FocusField="@focusField"  />
                 }
-
                 <!-- OUTLINE NOTES -->
                 else if (selectedNote is OutlineNote outlineNote)
                 {
                     <OutlineNoteComponent
                         @key="outlineNote.Id"
                         SelectedNote="outlineNote"
-                        OnDelete="DeleteNoteAsync" />
+                        OnDelete="DeleteNoteAsync"
+                        FocusField="@focusField" />
                 }
 
                 <!-- MAPPING NOTES -->
@@ -218,7 +220,8 @@
                     <MappingNoteComponent
                         @key="mappingNote.Id"
                         SelectedNote="mappingNote"
-                        OnDelete="DeleteNoteAsync" />
+                        OnDelete="DeleteNoteAsync"
+                        FocusField="@focusField" />
                 }
 
                 <!-- CHARTING NOTES -->
@@ -227,7 +230,8 @@
                     <ChartingNoteComponent
                         @key="chartingNote.Id"
                         SelectedNote="chartingNote"
-                        OnDelete="DeleteNoteAsync" />
+                        OnDelete="DeleteNoteAsync"
+                        FocusField="@focusField"  />
                 }
             }
             else
@@ -250,6 +254,8 @@
     private List<Note> notes = new();
 
     private Note? selectedNote;
+
+    private string focusField = "Title";
 
     private string newNoteType = "Text";
     private string searchText = "";
@@ -281,6 +287,7 @@
     private void SelectNote(Note note)
     {
         selectedNote = note;
+        focusField = "Content";
 
         showExportMenu = false;
         exportError = "";
@@ -288,6 +295,7 @@
 
     private async Task CreateNoteAsync()
     {
+        focusField = null;
         Note note = newNoteType switch
         {
             "Cornell" => new CornellNote(),
@@ -304,6 +312,7 @@
         notes.Insert(0, note);
 
         selectedNote = note;
+        focusField = "Title";
 
         showExportMenu = false;
         exportError = "";
@@ -354,5 +363,9 @@
         {
             isExporting = false;
         }
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        Guid test = selectedNote.Id;
     }
 }
