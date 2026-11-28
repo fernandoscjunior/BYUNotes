@@ -285,6 +285,36 @@ public class ExportNoteService(IJSRuntime JS)
                 }
             }
         }
+        else if (note is SentenceNote sentenceNote)
+{
+    var sentences = JsonSerializer.Deserialize<List<SentenceEntry>>(
+        string.IsNullOrWhiteSpace(sentenceNote.SentencesJson)
+            ? "[]"
+            : sentenceNote.SentencesJson
+    ) ?? new List<SentenceEntry>();
+
+    if (sentences.Count == 0)
+    {
+        builder.AppendLine("No sentences recorded.");
+    }
+    else
+    {
+        for (int i = 0; i < sentences.Count; i++)
+        {
+            builder.AppendLine(
+                $"{i + 1}. {sentences[i].Content}"
+            );
+
+            builder.AppendLine();
+        }
+    }
+
+    builder.AppendLine();
+
+    builder.AppendLine(markdown
+        ? $"**Total sentences:** {sentences.Count}"
+        : $"Total sentences: {sentences.Count}");
+}
 
         var content = builder.ToString();
 
